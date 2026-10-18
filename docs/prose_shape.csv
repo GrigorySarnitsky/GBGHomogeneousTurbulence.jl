@@ -144,9 +144,9 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § Specification and realization",226,107,0
 "ARCHITECTURE.md § The comparison machine",202,113,0
 "ARCHITECTURE.md § The foundation — one dynamics under a ladder of projections",231,114,0
-"Cache.jl :: Cache",370,103,0
+"Cache.jl :: Cache",377,103,0
 "Cache.jl :: ObservablesCache(domain; scalar = false, number_of_particles",715,220,1
-"Cache.jl :: fields_modified!(cache)",257,69,1
+"Cache.jl :: fields_modified!(cache)",260,69,1
 "Cache.jl :: particles_modified!(cache)",252,74,0
 "Cache.jl :: scalar_physical(cache)",55,54,0
 "Cache.jl :: velocity_at_particles(cache)",120,119,0
@@ -163,7 +163,7 @@ unit,words,longest_paragraph,admonitions
 "Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",944,169,1
 "Forcing.jl :: StochasticOUState",177,67,0
 "Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",901,333,1
-"Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",872,288,1
+"Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",874,288,1
 "Forcing.jl :: add_forcing_source!(forcing, forcing_state, N̂, field, domai",288,81,1
 "Forcing.jl :: band_energy_fraction(forcing; reynolds_box = nothing, reynol",224,74,1
 "Forcing.jl :: initial_forcing_state(forcing, field, domain)",130,57,0
@@ -334,8 +334,8 @@ unit,words,longest_paragraph,admonitions
 "observables_cache.md § 2. The system",89,89,0
 "observables_cache.md § 2.1 The equations",130,80,0
 "observables_cache.md § 2.2 How a step treats each term",131,131,0
-"observables_cache.md § 2.3 Transforms and arrays",545,110,0
-"observables_cache.md § 2.4 What it caches",708,596,0
+"observables_cache.md § 2.3 Transforms and arrays",548,110,0
+"observables_cache.md § 2.4 What it caches",711,599,0
 "observables_cache.md § 2.5 Three points the table alone does not settle",215,107,0
 "observables_cache.md § 3. The code",26,26,1
 "observables_cache.md § 3.1 The calls",126,126,0

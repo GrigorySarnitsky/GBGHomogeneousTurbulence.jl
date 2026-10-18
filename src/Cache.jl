@@ -36,16 +36,16 @@ rather than served stale.
 The solver's side of the contract is that `deposit!` fills every field-derived slot at the
 iteration's end (the velocity-at-particles slot is filled by the same generic's particle form,
 after the tracers advance) and sets
-its epoch. A caller reads through the accessors and deposits only to re-seed the cache after an
-out-of-band mutation it announced (`fields_modified!`); the iteration's own deposits are the
-solver's.
+its epoch. A caller reads through the accessors and deposits only to re-seed the cache after
+changing the state outside the iteration and announcing it (`fields_modified!`); the iteration's
+own deposits are the solver's.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
 and a slot is readable exactly when its own epoch equals the counter it depends on.
 
 An epoch is not a step count: a completed
 [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) advances the fields epoch, but so does any
-announced out-of-band mutation, so the two counts diverge. The epoch answers "is this value still the
+announced change made outside the iteration, so the two counts diverge. The epoch answers "is this value still the
 right one?"; the run's step counter
 [`current_step`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step) answers "how far has the run
 gone?".
@@ -350,7 +350,7 @@ were changed outside the iteration (a re-seeded velocity, any direct write to th
 Advances the fields epoch of `cache` (an [`ObservablesCache`](@ref)), so every cached observable is stale and reads throw until
 the next deposit; that interval belongs to whoever made the change.
 
-This verb is only for out-of-band changes — [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!)
+This verb is only for changes made outside the iteration — [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!)
 advances the epoch itself, and the closing deposit restores the cache. After a hand-made mutation,
 re-deposit with the
 `Propagator`'s [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) before advancing again —
@@ -377,7 +377,7 @@ fields_modified!(cache::ObservablesCache) =
   (advance_fields_epoch!(cache); cache.history_filled = 0; cache)
 
 
-# The run's OWN field advance, which is not an out-of-band replacement and must not clear the sample
+# The run's OWN field advance, which is not a replacement made outside the iteration and must not clear the sample
 # history: the samples it took are exactly what a multistep particle integration scheme integrates over next.
 # `step!` calls this at every stage, so clearing there would pin the scheme in its bootstrap forever
 # — the same trap the particles counterpart carries, and for the same reason: one verb was serving
@@ -425,7 +425,7 @@ particles_modified!(cache::ObservablesCache) =
   (advance_particles_epoch!(cache); cache.history_filled = 0; cache)
 
 
-# The run's OWN tracer advance, which is not an out-of-band change and must not clear the sample
+# The run's OWN tracer advance, which is not a change made outside the iteration and must not clear the sample
 # history: the samples it just took are exactly what a multistep scheme integrates over next. The two
 # were one verb until the history moved into this cache, at which point the difference stopped being
 # cosmetic — the routine path was clearing the history on every step and the multistep scheme could

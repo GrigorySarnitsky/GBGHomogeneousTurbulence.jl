@@ -4,7 +4,7 @@
 # both counters match its own", and `particles_modified!`: "Advances the particles epoch […] so every
 # trajectory-bound observable is stale and reads throw until the next deposit."
 #
-# Announcing an out-of-band reposition advances ONLY the particles epoch; the deposited sample is
+# Announcing a reposition made outside the iteration advances ONLY the particles epoch; the deposited sample is
 # then stale and the read must throw. It does not, because the accessor compares only the fields
 # epoch.
 
@@ -19,7 +19,7 @@ using GBGHomogeneousTurbulence.Cache: advance_particles_epoch!
   advance!(sim)                                   # a full iteration: every slot deposited
   v_before = copy(Array(velocity_at_particles(sim.cache)))   # readable here, by construction
 
-  # (a) the public announcement of an out-of-band reposition
+  # (a) the public announcement of a reposition made outside the iteration
   particles_modified!(sim.cache)
   @test_throws ErrorException velocity_at_particles(sim.cache)
 

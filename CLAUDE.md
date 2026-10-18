@@ -60,8 +60,8 @@ functions of state); realization / infrastructure concerns are named by their jo
   method measures, the cache method serves the deposit (decision 46).
 - `Cache` — the observables cache (`ObservablesCache`): the storage the iteration deposits
   its observables into at its end (no-recompute — the checked accessors serve the deposited value or
-  throw; a slot doubles as its producer's stage register; `fields_modified!` announces an
-  out-of-band state mutation). The design is `docs/src/observables_cache.md`.
+  throw; a slot doubles as its producer's stage register; `fields_modified!` announces a
+  state change made outside the iteration). The design is `docs/src/observables_cache.md`.
 - `Generator` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
   factor, gathered into `ResolvedGenerator` (conditions + assembly scratch) behind the protocol
   `prepare!` / `velocity_rhs!` / `scalar_rhs!` / `velocity_integrating_factor` /

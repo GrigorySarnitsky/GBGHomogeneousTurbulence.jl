@@ -1,6 +1,6 @@
 # ObservablesCache tests — the no-recompute contract: a read serves the deposited value or throws
 # (never rebuilds); slots double as the step's registers (taken mid-iteration, re-deposited at the
-# end); `fields_modified!` announces an out-of-band mutation and `deposit!` restores the
+# end); `fields_modified!` announces a change made outside the iteration and `deposit!` restores the
 # deposits; the completeness check refuses an iteration that left a slot undeposited.
 
 using GBGHomogeneousTurbulence
@@ -46,7 +46,7 @@ using Test
     @test velocity_physical(cache) isa Any
   end
 
-  @testset "out-of-band mutation: announce, then re-deposit" begin
+  @testset "a change made outside the iteration: announce, then re-deposit" begin
     cache = ObservablesCache(domain)
     deposit!(cache, state, domain, buffers)
     before = copy(field_data(velocity_physical(cache)))
@@ -87,7 +87,7 @@ using Test
 
   # A `Simulation` carries the cache; it is not itself a reading surface (decision 49). The user
   # reaches a deposited observable through `sim.cache` and the state through `sim.state`, so this
-  # exercises the out-of-band announce/re-deposit cycle on those two directly.
+  # exercises the announce/re-deposit cycle on those two directly.
   @testset "the announce/re-deposit cycle on a live run" begin
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; rng = MersenneTwister(4))
     u = velocity_physical(sim.cache)                                # the constructor's seeding deposit

@@ -1,4 +1,4 @@
-# Witness: an announced out-of-band replacement of the velocity field must not leave the
+# Witness: an announced replacement of the velocity field, made outside the iteration, must not leave the
 # Adams–Bashforth trajectory history holding samples measured in the field that was replaced.
 #
 # `random_solenoidal_velocity_spectral!`'s own note (src/State.jl:88-98) sanctions the sequence
@@ -20,7 +20,7 @@
 # The fix is NOT to clear the history inside `fields_modified!` as it stands: `step!` calls that
 # same verb (src/Propagator.jl:327, 430), so the history could never fill.  It is the split the
 # particle side already made — a private `advance_fields_epoch!` for the run's own step, with
-# `fields_modified!` the out-of-band verb that also discards the history, mirroring
+# `fields_modified!` the verb for a change made outside the iteration that also discards the history, mirroring
 # `advance_particles_epoch!` / `particles_modified!` (src/Cache.jl:388-397).  Verified: with that
 # split applied, departure_reseed falls to 0.0372 and this file passes.
 
@@ -62,7 +62,7 @@ end
   h = control.cache.history_steps[1]                  # keep stepping at the size the run has settled on
   departure_control = euler_departure!(control, h)
 
-  # ---- the sanctioned out-of-band reseed, exactly as the seeder's note prescribes ----
+  # ---- the sanctioned reseed outside the iteration, exactly as the seeder's note prescribes ----
   sim = fresh_sim()
   for _ in 1:5
     advance!(sim)

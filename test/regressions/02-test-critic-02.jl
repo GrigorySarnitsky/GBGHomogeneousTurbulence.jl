@@ -20,7 +20,7 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
   advance!(sim; dt = 0.01)
   @test size(velocity_at_particles(sim.cache)) == (4, 3)
 
-  # (1) A fields-only out-of-band mutation. The positions are untouched, so the particles epoch
+  # (1) A fields-only change made outside the iteration. The positions are untouched, so the particles epoch
   #     still matches; only `velocity_at_particles_fields_epoch` falls behind, and the read must still throw.
   fields_modified!(sim.cache)
   @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch   # the other counter agrees

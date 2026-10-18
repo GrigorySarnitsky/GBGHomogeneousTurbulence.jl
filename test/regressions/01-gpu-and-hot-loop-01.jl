@@ -52,7 +52,7 @@ end
   # CORRECTED 2026-08-20. As written, this wrote the tracer storage and recorded the fresh sample
   # WITHOUT announcing the reposition, then demanded the history restart anyway — which would require
   # the integrator to detect an unannounced mutation of an array it does not watch, i.e. a per-step
-  # comparison and a host-device sync. The contract is that an out-of-band write is announced;
+  # comparison and a host-device sync. The contract is that a write made outside the iteration is announced;
   # `particles_modified!` is the announcement, and the sibling witness 03-state-machine-03 tests the
   # announced path. Adding the announcement here makes this test the contract rather than a stronger
   # claim no design satisfies.

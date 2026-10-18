@@ -1,4 +1,4 @@
-# Witness: an announced out-of-band change to the resolved fields must not leave the multistep
+# Witness: an announced change to the resolved fields, made outside the iteration, must not leave the multistep
 # particle integration scheme extrapolating over Lagrangian samples taken in the abandoned flow.
 #
 # The package states the invariant for the position case (`restart!` / `particles_modified!`:
@@ -31,7 +31,7 @@ function announced_reseed!(s)
   return s
 end
 
-@testset "an announced out-of-band field change must not feed pre-mutation Lagrangian samples into the next multistep tracer update" begin
+@testset "an announced field change made outside the iteration must not feed pre-mutation Lagrangian samples into the next multistep tracer update" begin
   a = warmed_run(3)
   b = warmed_run(3)
   @test a.cache.history_filled == 3                       # AB4 is past its bootstrap

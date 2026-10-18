@@ -38,7 +38,7 @@ end
   # ————— (1) the run layer's guard on a genuinely stale sample —————
   guarded = fresh_sim(1)
   advance!(guarded; dt = dt)
-  fields_modified!(guarded.cache)               # an out-of-band state change: the sample is now stale
+  fields_modified!(guarded.cache)               # a state change made outside the iteration: the sample is now stale
   @test_throws ErrorException velocity_at_particles(guarded.cache)
   @test_throws ErrorException advance!(guarded; dt = dt)
 

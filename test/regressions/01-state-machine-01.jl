@@ -2,8 +2,8 @@
 #
 # `velocity_at_particles(cache)`'s own docstring and `check_deposits` agree that the sample is current
 # only when `velocity_at_particles_fields_epoch == fields_epoch` AND `velocity_at_particles_particles_epoch == particles_epoch`
-# (it is a function of the state and of the positions together). After an announced out-of-band
-# reposition — `particles_modified!` — that has not yet been completed with
+# (it is a function of the state and of the positions together). After an announced reposition made
+# outside the iteration — `particles_modified!` — that has not yet been completed with
 # the particle `deposit!`, the sample is stale: it holds
 # u(tₙ, X_old), not u(tₙ, X_new). The read must throw, and `advance!` — whose opening guard is
 # exactly this read — must refuse to step on it.
@@ -27,7 +27,7 @@ end
     sim = fresh_run()
     v_before = copy(Array(velocity_at_particles(sim.cache)))
 
-    # An out-of-band reposition, announced exactly as the docstring prescribes, and NOT yet
+    # A reposition made outside the iteration, announced exactly as the docstring prescribes, and NOT yet
     # completed with the particle `deposit!`.
     L = sim.domain.grid.domain_size[1]
     point_positions(sim.tracers.positions) .= mod.(point_positions(sim.tracers.positions) .+ 0.3, L)

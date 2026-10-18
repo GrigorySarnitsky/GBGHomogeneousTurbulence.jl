@@ -536,7 +536,7 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     in limiting cases (Bussi, Donadio & Parrinello 2007) — and the fix is to extend the dynamics with feedback rather
     than project after the fact.
 
-    Two configurations also behave sharply. Under `:total`, if the out-of-band value alone exceeds
+    Two configurations also behave sharply. Under `:total`, if the value outside the band alone exceeds
     `target`, the band is zeroed — the closest reachable state, and the most violent intervention
     the rescale can make. At the other end an empty band is left alone rather than divided by ~0,
     so it stays empty instead of being driven to `target`. Seed content in the band if a run depends

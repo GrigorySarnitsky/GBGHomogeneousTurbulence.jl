@@ -170,7 +170,7 @@ end
     for _ in 1:4; advance!(sim); end
     @test sim.cache.history_filled == 3               # history full: AB4 from here on
 
-    # The run's own advance must NOT be read as an out-of-band reposition: it announces the tracer
+    # The run's own advance must NOT be read as a reposition made outside the iteration: it announces the tracer
     # push every step, and clearing the history there would pin the scheme in its bootstrap forever.
     advance!(sim)
     @test sim.cache.history_filled == 3

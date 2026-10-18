@@ -341,7 +341,7 @@ spline by default, so the sampled velocity is continuously differentiable along 
 A multistep particle integration scheme looks further back, and the cache is where that history lives: built
 with `history_depth` above 1 it keeps a bounded ring of past velocity samples —
 `history_depth` minus one further ``M\times3`` arrays beyond the current slot — which `AdamsBashforth`
-integrates over and an out-of-band reposition discards (`particles_modified!`). The history rides
+integrates over and a reposition made outside the iteration discards (`particles_modified!`). The history rides
 the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
 latest deposit, and it exists here rather than in the scheme's registers because the object that
 owns the epoch owns the invalidation.
@@ -362,7 +362,7 @@ there is no moment to date it to, so no act at an observation builds it either.
 | ``\boldsymbol{\omega}`` | physical, grid | yes | the closing recovery; read by the advective-term assembly |
 | ``\varphi`` | physical, grid | yes | the closing recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity at the particles | ``M\times3`` at points | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
-| the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | kept only when a multistep particle integration scheme asks for depth; rotated at each sample deposit, discarded by an out-of-band reposition |
+| the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | kept only when a multistep particle integration scheme asks for depth; rotated at each sample deposit, discarded by a reposition made outside the iteration |
 | the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | the closing reduction over the cached velocity; read by the next timestep choice |
 | ``-\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u})``, dealiased | spectral, grid | no | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | not surviving, for the same reason as the row above |

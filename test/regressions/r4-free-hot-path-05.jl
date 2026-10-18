@@ -14,7 +14,7 @@ using GBGPeriodicFields: field_data
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = PassiveScalar(),
                    rng = MersenneTwister(2))
 
-  # The sanctioned out-of-band route: write the state's storage directly, announce it, re-deposit.
+  # The sanctioned route outside the iteration: write the state's storage directly, announce it, re-deposit.
   field_data(sim.state.scalar_spectral)[3, 3, 3] = NaN + 0im
   fields_modified!(sim.cache)
   deposit!(sim)

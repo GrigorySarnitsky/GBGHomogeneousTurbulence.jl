@@ -45,17 +45,17 @@ strip_band!(field, band) = convolve!(field, field, band, -1, 1)
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
                        dealiasing = TwoThirds(), array_family = Array)
 
-  @testset ":total with the out-of-band value above `target` empties the band" begin
+  @testset ":total with the value outside the band above `target` empties the band" begin
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                          envelope_wavenumber = 8.0, rng = MersenneTwister(21))
     scratch = new_vector_field_spectral(domain)
-    forcing = VarianceRescaling(domain; target = 1e-4, over = :total)   # far below the out-of-band energy
+    forcing = VarianceRescaling(domain; target = 1e-4, over = :total)   # far below the energy outside the band
 
     band_before = band_kinetic_energy(û, forcing.band, scratch)
     total_before = kinetic_energy(û)
     @test band_before > 0                                  # the ordinary path would run …
-    @test total_before - band_before > forcing.target       # … but the out-of-band value alone exceeds `target`
+    @test total_before - band_before > forcing.target       # … but the value outside the band alone exceeds `target`
 
     outside_before = outside_band(û, forcing.band, scratch)
     project_forcing!(forcing, û, domain)

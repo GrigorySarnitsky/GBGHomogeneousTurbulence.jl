@@ -59,7 +59,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   sim = Simulation(domain; viscosity = 0.05, particles = ParticleTracking(number_of_particles = 4, unwrapped = true),
                    rng = MersenneTwister(1))
   for _ in 1:3; advance!(sim); end
-  point_positions(sim.tracers.positions) .= 0.5                 # hand reposition (out-of-band)
+  point_positions(sim.tracers.positions) .= 0.5                 # hand reposition (outside the iteration)
   particles_modified!(sim)
   @test all(point_positions(unwrapped_positions(sim.tracers)) .== 0.5)    # winding restarted with the new path
 end

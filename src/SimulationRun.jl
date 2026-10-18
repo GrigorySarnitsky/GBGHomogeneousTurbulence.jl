@@ -1192,8 +1192,8 @@ function particles_modified!(sim::Simulation)
 end
 
 
-# The fields twin, for the same reason its particle counterpart exists: an out-of-band replacement of
-# the state invalidates the Lagrangian sample history a multistep particle integration scheme integrates over,
+# The fields twin, for the same reason its particle counterpart exists: a replacement of the state
+# made outside the iteration invalidates the Lagrangian sample history a multistep particle integration scheme integrates over,
 # and the cache form is what discards it. Added because the particle form was and this one was not —
 # a caller holding a run should not have to know which of the two verbs happens to have the
 # convenience method.
@@ -1202,7 +1202,7 @@ end
 # cache form cannot check what it cannot reach). The tolerance is scale-aware: hand-written partners
 # computed through different operation orders may disagree at roundoff, which is not a violation;
 # an O(1) inconsistency is. `reality_residual` sweeps only the folded axis's self-mirrored planes —
-# O(N²), and this verb is out-of-band, never the hot loop.
+# O(N²), and this verb is called outside the iteration, never in the hot loop.
 function fields_modified!(sim::Simulation)
   _check_reality(sim.state.velocity_spectral, "velocity")
   sim.state.scalar_spectral === nothing || _check_reality(sim.state.scalar_spectral, "scalar")

@@ -28,7 +28,7 @@ using GBGHomogeneousTurbulence
   @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch
   @test size(velocity_at_particles(sim.cache)) == (8, 3)
 
-  # Announce an out-of-band reposition: the positions the sample belongs to are abandoned.
+  # Announce a reposition made outside the iteration: the positions the sample belongs to are abandoned.
   particles_modified!(sim.cache)
   @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch        # fields untouched
   @test sim.cache.velocity_at_particles_particles_epoch != sim.cache.particles_epoch  # positions moved on

@@ -36,7 +36,7 @@ using GBGHomogeneousTurbulence
   v0 = copy(velocity_at_particles(sim.cache))
   @test size(v0) == (8, 3)
 
-  # An out-of-band reposition, announced through the sanctioned verb. The state is untouched; the
+  # A reposition made outside the iteration, announced through the sanctioned verb. The state is untouched; the
   # positions the sample belongs to are abandoned.
   point_positions(sim.tracers.positions) .= 0.5 .* point_positions(sim.tracers.positions)
   particles_modified!(sim)
