@@ -129,10 +129,11 @@ nothing by default. The generator calls the first once, when it is built, and a 
 - [`add_forcing_source!`](@ref) — at every stage: add a source term to the right-hand side.
 - [`project_forcing!`](@ref) — once, after the completed step: project or rescale the advanced field.
 
-The rate and the source are two channels of one forcing term: the steady part folded exactly into
-the integrating factor, the remainder added at the stages. A single strategy may use both.
+A forcing term divides as the rest of the equation does: its steady linear part joins the viscous
+term in the integrating factor and is integrated exactly; the remainder joins the explicit
+right-hand side and is evaluated at every Runge–Kutta stage. A single strategy may use both.
 
-Which channel a rate may take is decided by steadiness in time, not by linearity in the field. The
+Which part a rate may join is decided by steadiness in time, not by linearity in the field. The
 integrating factor holds a rate fixed for the whole step, so a rate re-solved from the state must go
 through `add_forcing_source!` instead; freezing it in the integrating factor would drop the scheme to
 first order.

@@ -394,8 +394,9 @@ state the first advances; each defaults to doing nothing:
 
 A step calls the four in a fixed order — `steady_linear_rate` once, when the generator is
 built; then per step `prepare_forcing!` before the stages, `add_forcing_source!` at every stage,
-`project_forcing!` after the completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
-part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
+`project_forcing!` after the completed step. A forcing term divides as the rest of the equation does:
+its steady linear part joins the viscous term in ``\mathcal{E}`` and is integrated exactly, and the
+remainder joins the explicit right-hand side, evaluated at every stage. A strategy owns whatever scratch its
 methods need; none receives the scheme's buffers (§11 decision 32). What a strategy *evolves* is not
 scratch: it lives in the `modeled` slot of `ResolvedFields`, so that one record is the whole
 evolving state of the run (§8's open-systems reading; §11 decisions 23 and 90).
