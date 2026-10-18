@@ -719,8 +719,6 @@ end
 """
     VarianceController(domain; target, gain = 1, turnover_time = nothing,
                        lowest_shell = 1, highest_shell = 2)
-    VarianceController(; target = nothing, gain = 1, turnover_time = nothing,
-                       lowest_shell = 1, highest_shell = 2)
 
 Hold the field's variance at `target` by feedback — the kinetic energy ``k`` for the velocity,
 ``\\langle\\varphi^{2}\\rangle`` for the scalar — with the constant-``k`` controller of
@@ -756,8 +754,8 @@ left alone rather than divided by ``\\sim 0`` (the floor `ConstantPower` documen
 in the band if the run depends on the controller taking hold.
 
 # Arguments
-- `domain` — the [`FixedDomain`](@ref) the band kernel is built on (the first form; the
-  domain-free second form defers that to the run, as a [`DeferredForcing`](@ref)).
+- `domain` — the [`FixedDomain`](@ref) the band kernel is built on; without it the constructor
+  returns the deferred form, a [`DeferredForcing`](@ref).
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
   kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar. The deferred
   velocity form may leave it out, and the run then supplies its stationary ``k``.
@@ -786,13 +784,13 @@ in the band if the run depends on the controller taking hold.
   mean, on any grid: the band-free linear forcing of Lundgren (2003) that physical-space codes apply, where
   ``k_{\\mathrm{band}} = k`` — the form Bassenne et al. designed the controller in.
 
-The molecular-dynamics thermostats map the design space exactly, and this controller is the
-Berendsen-weak-coupling analogue — gain-limited relaxation toward a target (Berendsen et al. 1984), carrying that class's known caveat: the
-held quantity's own fluctuations are distorted by the coupling. Per-step rescaling is the naive
-thermostat, whose limit here is `VarianceRescaling`; the contrasting extended-variable class
-that restores canonical fluctuations is Nosé–Hoover
-(Nosé 1984; Hoover 1985), a design this package
-does not take.
+This controller is the turbulence counterpart of the Berendsen thermostat of molecular dynamics
+(Berendsen et al. 1984), which relaxes the temperature by the same law. It shares that thermostat's
+known cost: the held quantity's fluctuations are removed, since ``k`` relaxes to ``k_\\infty`` and
+then stays there, and the flow's variability moves into ``\\varepsilon`` and the injected power.
+Per-step rescaling, the cruder thermostat, is `VarianceRescaling` here. Keeping the fluctuations of
+``k`` takes an extended-variable thermostat, that of Nosé (1984) and Hoover (1985), whose rate is a
+dynamical variable with an equation of motion of its own.
 
 !!! note "The settling time, not the gain, is the physical parameter"
     Only the ratio ``t_\\ell/G`` is observable: it is how long the variance takes to return after a
@@ -1173,7 +1171,8 @@ every additive source. For a given sequence of amplitudes the field then advance
 order, but the forcing itself is resolved in time only step by step, so ``T_L`` should span many steps.
 
 # Arguments
-- `domain` — the `FixedDomain` of the run this forcing drives.
+- `domain` — the `FixedDomain` of the run this forcing drives; without it the constructor returns
+  the deferred form, a [`DeferredForcing`](@ref).
 - `forcing_variance` — the stationary mean square ``\\sigma^{2}`` of the added term, as above. A
   deferred velocity forcing may leave it out, and the run then supplies ``\\varepsilon/T_L``, the
   variance whose estimated injection matches its stationary ``\\varepsilon``.

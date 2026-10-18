@@ -160,9 +160,9 @@ unit,words,longest_paragraph,admonitions
 "Forcing.jl :: Forcing",536,95,0
 "Forcing.jl :: Linear(domain; rate, lowest_shell = 1, highest_shell = 2)",293,146,0
 "Forcing.jl :: NoForcing()",16,15,0
-"Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",944,169,1
+"Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",954,179,1
 "Forcing.jl :: StochasticOUState",177,67,0
-"Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",930,347,1
+"Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",933,342,1
 "Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",897,311,1
 "Forcing.jl :: add_forcing_source!(forcing, forcing_state, N̂, field, domai",288,81,1
 "Forcing.jl :: band_energy_fraction(forcing; reynolds_box = nothing, reynol",224,74,1
