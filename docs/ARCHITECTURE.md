@@ -2578,7 +2578,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     op sequence is bit-identical to the pre-refactor body — and the audit op model mirrors the
     same factoring (`rk4_ops` = the RK3 iteration at five stages). All three audits extended:
     memory cells equal :RK3's in every configuration (stages, not registers — the equality is
-    the claim), transform/pass cells AUDIT_PRINT-generated and frozen, the optimality floors
+    the claim), transform/pass cells `AUDIT_PRINT`-generated and frozen, the optimality floors
     reflective. Fourth-order convergence pinned by test (ratio ≈ 16); `recommended_cfl` prices
     the larger ceiling (base 0.96, rounded down from ``0.5 \cdot y_s/\sqrt{3}``); checkpoint
     round-trips bitwise. A side effect worth naming: under a fourth-order field the existing
