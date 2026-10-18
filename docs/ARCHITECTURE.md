@@ -437,6 +437,15 @@ band's energy ``k_{\mathrm{band}}``, predicted by `predicted_stationary_state` t
 ``\varepsilon/(2k_{\mathrm{band}})`` and `VarianceRescaling(over = :band)`'s target ``k_{\mathrm{band}}``
 too. A scalar forcing states its target, since no scalar state is modelled.
 
+Which keywords carry defaults follows one test: does the value come from the method, or from the
+run? A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's, so it defaults; what
+a run holds fixed or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`, the
+correlation time — has no canonical value and is required. A `seed` is neither: any value gives an
+equally valid realization, so one left out is drawn — from the run's `rng` when `Simulation` builds
+the forcing, from the global stream otherwise — and naming it is how a run is repeated (decisions 107
+and 110). The deferred velocity forcing's strength above is the one relaxation, and it is the run's
+own: the value still comes from the run, not from a default.
+
 ### 4.5 `Propagator` — the map that advances the state in time
 
 `Propagator` realizes the Mori–Zwanzig propagator: the map that carries the state forward in time, built

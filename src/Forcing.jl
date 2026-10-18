@@ -72,17 +72,6 @@ Construction and persistence:
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
   parameters as one self-describing group (available once `HDF5` is loaded).
 
-Which keywords carry defaults follows one test: does the value come from the method, or from this
-run? A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
-a run holds fixed, or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`,
-the correlation time — has no canonical value and is required. A `seed` is neither: any value gives an
-equally valid realization, so one omitted is drawn — from the run's `rng` when a `Simulation`
-builds the forcing, from the global stream otherwise — and naming it is how a run is repeated.
-
-The one relaxation is the run's own: a deferred velocity forcing may leave its target out, and the
-run fills it from the stationary state it is set up for — the value still comes from the run, not
-from a default here.
-
 A band reaching above the dealias cutoff is inert there for a forcing that multiplies the field — the
 mask holds those modes empty — so construction warns about it; the additive `StochasticOU` would
 inject there instead, and refuses such a band. `highest_shell = Inf` asks for that reach on purpose —
