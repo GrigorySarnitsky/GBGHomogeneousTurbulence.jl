@@ -489,9 +489,12 @@ to the field being a vector.
   ``k_{\\mathrm{band}}`` for `over = :band`. That prediction takes the band's share of ``k`` to be the one
   `over = :total` holds on the same band: both rescale the same modes, and they are taken to reach
   the same stationary flow.
-- `over` — *where* the target applies, `:band` or `:total`. It is required, since a deterministic
-  clamp destroys the physical fluctuation of whatever it holds and no default is right for every run,
-  and the two modes differ in which quantity a run may no longer measure:
+- `over` — *where* the target applies, `:band` or `:total`. It is required because the right
+  choice depends on what the run is calibrated against. A
+  [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) deriving ``\\nu`` derives it
+  from the assumed kinetic energy, so a `VarianceRescaling` given to it must be `:total`, or that
+  calibration stops holding; where nothing calibrates against ``k``, `:band` is the gentler clamp.
+  The two modes differ in which quantity a run may no longer measure:
     * `:band` holds the band's own value. The whole-field value then floats, oscillating about its
       mean as the band feeds the cascade. On the default shells 1–2 — the energy-containing range —
       most of ``k`` is held rather than free, though it remains a measurable.
@@ -505,11 +508,6 @@ to the field being a vector.
   the band is every retained mode but the mean, on any grid, and the two modes of `over` coincide —
   the mean holds nothing in a field started without one — so a single factor rescales the whole
   field: the rescaling a physical-space code applies.
-
-Neither is a default, because the right answer depends on what the run is calibrated against.
-A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
-from the *assumed* kinetic energy, so a forcing put there by hand must be a `:total` one or that
-calibration stops holding. Where nothing calibrates against it, `:band` is the gentler clamp.
 
 Sizing the rescale reduces the field to a number, so each step blocks on one device-to-host
 transfer: the band and whole-field observables ride a single fused traversal, in either mode.

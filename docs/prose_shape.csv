@@ -163,7 +163,7 @@ unit,words,longest_paragraph,admonitions
 "Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",954,179,1
 "Forcing.jl :: StochasticOUState",177,67,0
 "Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",933,342,1
-"Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",897,311,1
+"Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",869,338,1
 "Forcing.jl :: add_forcing_source!(forcing, forcing_state, N̂, field, domai",288,81,1
 "Forcing.jl :: band_energy_fraction(forcing; reynolds_box = nothing, reynol",224,74,1
 "Forcing.jl :: initial_forcing_state(forcing, field, domain)",130,57,0
