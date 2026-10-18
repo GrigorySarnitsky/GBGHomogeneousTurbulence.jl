@@ -163,8 +163,14 @@ abstract type AbstractForcing end
 """
     DeferredForcing
 
-A `DeferredForcing` is a forcing named before its domain exists. The keyword constructors,
-which take no domain,
+A `DeferredForcing` is a forcing named before its domain exists. It is built into the concrete
+`AbstractForcing` once the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain)
+exists, which [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) does for you. A
+forcing argument therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking
+constructor) or a `DeferredForcing`.
+
+These keyword constructors take no domain, and each returns a `DeferredForcing` holding its
+keywords:
 
     ConstantPower(; injection_rate = nothing, lowest_shell = 1, highest_shell = 2)
 
@@ -178,12 +184,6 @@ which take no domain,
                  highest_shell = 2, seed = nothing)
 
     Linear(; rate = nothing, lowest_shell = 1, highest_shell = 2)
-
-each return a `DeferredForcing` holding their keywords. It is built into the concrete
-`AbstractForcing` once the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain)
-exists, which [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) does for you. A
-forcing argument therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking
-constructor) or a `DeferredForcing`.
 
 **Only the deferred form may leave its target out**, because only a run can supply it. A velocity
 forcing built by `Simulation` then takes the quantity it controls from the stationary state the
