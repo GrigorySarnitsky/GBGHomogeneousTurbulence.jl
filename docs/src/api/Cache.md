@@ -22,7 +22,7 @@ particles_modified!
 ## The checked reads
 
 Each accessor returns the observable deposited at the current epoch, or throws; the cached
-maximum speed is read through `max_speed`, documented with the reduction it stores.
+maximum speed is read through [`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed), documented with the reduction it stores.
 
 ```@docs
 velocity_physical

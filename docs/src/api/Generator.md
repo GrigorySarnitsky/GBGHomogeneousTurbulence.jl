@@ -25,8 +25,8 @@ ResolvedGenerator
 
 ## The generator protocol
 
-A scheme sees one step of the dynamics this way: it opens with `prepare!`, evaluates the right-hand
-sides and the exact linear factors at each stage, and closes with `finalize!`.
+A scheme sees one step of the dynamics this way: it opens with [`prepare!`](@ref GBGHomogeneousTurbulence.Generator.prepare!), evaluates the right-hand
+sides and the exact linear factors at each stage, and closes with [`finalize!`](@ref GBGHomogeneousTurbulence.Generator.finalize!).
 
 ```@docs
 prepare!

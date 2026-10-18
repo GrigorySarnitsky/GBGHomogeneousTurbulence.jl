@@ -146,7 +146,7 @@ continues; only then does the next iteration run. Read from the callback's side 
 iteration, which is how [`run!`](@ref) describes it — the same loop, named from the two ends. Stopping
 is thereby the caller's decision on observables, not a run option — a budget in turnovers, for
 instance, is a callback that accumulates ``\Delta t \varepsilon/k`` — the eddy-turnover clock — and says stop. Every instant a run
-reaches is observed exactly once: the first because the `Simulation` constructor makes a deposit seeding the initial
+reaches is observed exactly once: the first because the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor makes a deposit seeding the initial
 state as it builds the run, the last because the observation that stops the run has already
 read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
 closing deposit has no following iteration to fold into; it serves the final observation instead.
@@ -311,7 +311,7 @@ Under a mask rule one *evaluation* of the velocity term proceeds as follows: rec
 vorticity's own array, as below — and transform it back (3 forward); apply ``\mathbb{P}`` and the
 mask, both per-wavenumber multiplications.
 
-Counts are per step of a three-stage scheme (`IFLowStorageRK3`); a scheme with a different stage
+Counts are per step of a three-stage scheme ([`IFLowStorageRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK3)); a scheme with a different stage
 count scales them by its own.
 
 | dealiasing rule | velocity only | with the scalar |
@@ -340,8 +340,8 @@ spline by default, so the sampled velocity is continuously differentiable along 
 
 A multistep particle integration scheme looks further back, and the cache is where that history lives: built
 with `history_depth` above 1 it keeps a bounded ring of past velocity samples —
-`history_depth` minus one further ``M\times3`` arrays beyond the current slot — which `AdamsBashforth`
-integrates over and a reposition made outside the iteration discards (`particles_modified!`). The history rides
+`history_depth` minus one further ``M\times3`` arrays beyond the current slot — which [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)
+integrates over and a reposition made outside the iteration discards ([`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!)). The history rides
 the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
 latest deposit, and it exists here rather than in the scheme's registers because the object that
 owns the epoch owns the invalidation.
@@ -370,7 +370,7 @@ there is no moment to date it to, so no act at an observation builds it either.
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
 | ``E(\kappa_n)``, the spectral density at wavenumber shell ``n`` | per shell | no | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | not computed: no iteration forms it |
-| the strain-rate tensor ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | not computed in an iteration; the derivative-skewness stopping test of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed point by point inside one averaging pass and never materialized at all, at its own cadence |
+| the strain-rate tensor ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | not computed in an iteration; the derivative-skewness stopping test of [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!) materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed point by point inside one averaging pass and never materialized at all, at its own cadence |
 | the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | not computed as a field: [`max_speed`](@ref) forms the magnitude point by point inside its reduction and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
 | ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | no | not computed: the step multiplies by the integrating factor instead of forming the term (§2.2) |
 | ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` | — | no | not computed: the rate is folded into the integrating factor and the product never exists (§2.2) |
@@ -416,7 +416,7 @@ The [`run!`](@ref) driver is the observation-first loop: after every iteration (
 return decides continuation. The accessors [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 and [`scalar_physical`](@ref) return the
 deposited field, and [`max_speed`](@ref) the deposited number — each a checked read that throws when
-no deposit is current. The closing [`deposit!`](@ref) ends an iteration (the run layer's `advance!` calls it
+no deposit is current. The closing [`deposit!`](@ref) ends an iteration (the run layer's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) calls it
 after every step; the `Simulation` constructor makes the seeding deposit), and
 [`fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
 fields* being the two integrated fields — after which reads

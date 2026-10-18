@@ -8,11 +8,11 @@ Order   = [:module]
 ## Forcing strategies
 
 The forcing supertype and its concrete strategies, grouped by the route each takes through the step —
-which is what decides whether it preserves the scheme's order. `Linear` supplies a steady rate folded
-into the integrating factor, exactly and for free. `ConstantPower` and `VarianceController` supply
-rates that track the state, so they enter the right-hand side at every stage. `VarianceRescaling`
+which is what decides whether it preserves the scheme's order. [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) supplies a steady rate folded
+into the integrating factor, exactly and for free. [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) and [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) supply
+rates that track the state, so they enter the right-hand side at every stage. [`VarianceRescaling`](@ref GBGHomogeneousTurbulence.Forcing.VarianceRescaling)
 rescales after the step, which is operator splitting and first-order by construction.
-At every stage `StochasticOU` adds a random force that does not depend on the flow. One
+At every stage [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) adds a random force that does not depend on the flow. One
 implementation serves either the velocity or the scalar.
 
 ```@docs
@@ -57,8 +57,8 @@ DeferredForcing
 ## Forcing methods
 
 This section documents the method that creates a strategy's evolving state, then the four methods a strategy may implement
-(each a no-op by default): the per-step `prepare_forcing!`, the rate `steady_linear_rate` the
-generator asks for once when it is built, and the per-stage and post-step hooks in the order `step!`
+(each a no-op by default): the per-step [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!), the rate [`steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.steady_linear_rate) the
+generator asks for once when it is built, and the per-stage and post-step hooks in the order [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!)
 fires them.
 
 ```@docs

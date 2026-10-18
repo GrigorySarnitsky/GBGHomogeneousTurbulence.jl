@@ -23,7 +23,7 @@ unwrapped_positions
 ## The particle integration scheme
 
 How the positions are advanced over one step — the Lagrangian counterpart of the field schemes.
-`Heun` reaches second order with a second interpolation per step; `AdamsBashforth` reaches
+[`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) reaches second order with a second interpolation per step; [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) reaches
 further by reusing the Lagrangian samples already deposited, at no extra interpolation. Each
 scheme's storage is allocated by
 [`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers), which a run calls for
@@ -45,7 +45,7 @@ The steps of Lagrangian tracking: record the flow velocity where each tracer cur
 the tracers once the fields have moved, then read any physical field at the particle positions for
 the Lagrangian statistics. Recording and pushing are two verbs because `Heun` needs the velocity
 at both ends of the step: the run records the sample at the iteration's end, off the just-deposited
-velocity, and the next iteration's `advect!` reads it back as the first half of its pair.
+velocity, and the next iteration's [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) reads it back as the first half of its pair.
 
 ```@docs
 advect!
@@ -60,7 +60,7 @@ The memory-locality order the gathers visit the tracers in — a value-preservin
 interpolated values are bit-identical with or without it, only the visiting order changes. A run
 builds and refreshes it for you (the `traversal_mode` of a `ParticleTracking`); the type and
 its rebuild verb are here for a caller driving the tracking loop by hand, or refreshing on a chosen
-cadence from a `run!` callback.
+cadence from a [`run!`](@ref GBGHomogeneousTurbulence.SimulationRun.run!) callback.
 
 ```@docs
 ParticleTraversal
@@ -72,7 +72,7 @@ rebuild_traversal!
 
 ## Point-value buffers
 
-Allocate the point-value `out` for `interpolate_at_particles!` — a
+Allocate the point-value `out` for [`interpolate_at_particles!`](@ref GBGHomogeneousTurbulence.Particles.interpolate_at_particles!) — a
 [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
 velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
 for the scalar.
@@ -84,8 +84,8 @@ new_scalar_point_values
 
 ## Wiring tracers into a run
 
-Give `Simulation` a [`ParticleTracking`](@ref GBGHomogeneousTurbulence.SimulationRun.ParticleTracking)
-and the run carries a tracer set: `advance!` pushes it every iteration and records the Lagrangian
+Give [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) a [`ParticleTracking`](@ref GBGHomogeneousTurbulence.SimulationRun.ParticleTracking)
+and the run carries a tracer set: [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) pushes it every iteration and records the Lagrangian
 sample, so the reads below are always current between iterations.
 
 ```julia

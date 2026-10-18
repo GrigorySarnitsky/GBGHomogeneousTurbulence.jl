@@ -42,7 +42,7 @@ using GBGHomogeneousTurbulence
 
 ## Quick start
 
-Build a case with the `Simulation` constructor, which builds every component for
+Build a case with the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor, which builds every component for
 you — spin it up to stationarity, and advance it:
 
 ```julia
@@ -98,31 +98,31 @@ Listed in build order — each module uses the ones above it. The
 [API overview](api.md) lists the same surface in *reading* order, leading with the run layer.
 
 - [`SimulationDomain`](api/SimulationDomain.md): the discretized periodic box a run lives on — the
-  `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
+  [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain), its choice of [`DealiasingStrategy`](@ref GBGHomogeneousTurbulence.SimulationDomain.DealiasingStrategy), and the scratch-field allocators.
 - [`Observables`](api/Observables.md): the measured functions of state — the energy and dissipation
   diagnostics of the flow and the scalar (including
-  `kinetic_energy_and_dissipation`, both in one pass), the developed-turbulence marker (`derivative_skewness`),
-  the spectrum-derived scales, the CFL speed bound (`max_speed`), and the one field-valued
+  [`kinetic_energy_and_dissipation`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy_and_dissipation), both in one pass), the developed-turbulence marker ([`derivative_skewness`](@ref GBGHomogeneousTurbulence.Observables.derivative_skewness)),
+  the spectrum-derived scales, the CFL speed bound ([`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed)), and the one field-valued
   observable, the vorticity recovery.
-- [`State`](api/State.md): the evolving state (`ResolvedFields`, from which every other representation is recovered) a step
+- [`State`](api/State.md): the evolving state ([`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields), from which every other representation is recovered) a step
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
-- [`Cache`](api/Cache.md): the `ObservablesCache` — where each *iteration* (one advance of the
+- [`Cache`](api/Cache.md): the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) — where each *iteration* (one advance of the
   run; the notation page's vocabulary gives its full anatomy) leaves the observables it produced,
   read through checked reads that serve the deposited value or throw. Nothing is ever recomputed on
   a read.
-- [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
+- [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing),
   chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor — gathered
-  into one object, the `ResolvedGenerator`, which a scheme consumes through a fixed set of functions —
-  `prepare!`, `velocity_rhs!`, `scalar_rhs!`, `velocity_integrating_factor`,
-  `scalar_integrating_factor` and `finalize!` —
+  into one object, the [`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator), which a scheme consumes through a fixed set of functions —
+  [`prepare!`](@ref GBGHomogeneousTurbulence.Generator.prepare!), [`velocity_rhs!`](@ref GBGHomogeneousTurbulence.Generator.velocity_rhs!), [`scalar_rhs!`](@ref GBGHomogeneousTurbulence.Generator.scalar_rhs!), [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor),
+  [`scalar_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.scalar_integrating_factor) and [`finalize!`](@ref GBGHomogeneousTurbulence.Generator.finalize!) —
   rather than assembling the physics itself.
 - [`Propagator`](api/Propagator.md): the interchangeable integrating-factor schemes under
-  `AbstractIntegrator`.
+  [`AbstractIntegrator`](@ref GBGHomogeneousTurbulence.Propagator.AbstractIntegrator).
 - [`Particles`](api/Particles.md): Lagrangian particle tracking — today the massless tracer —
   advection along trajectories and field sampling there, with selectable interpolation and
   particle integration schemes.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the
-  Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. Read the state through `sim.state`, the deposited observables through
+  Courant–Friedrichs–Lewy (CFL) adaptive loop ([`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) / [`run!`](@ref GBGHomogeneousTurbulence.SimulationRun.run!) / [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!)) that drives it. Read the state through `sim.state`, the deposited observables through
   `sim.cache`.
