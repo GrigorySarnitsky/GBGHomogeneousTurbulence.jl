@@ -41,7 +41,8 @@ called at its own point of the step and each doing nothing unless the strategy d
 
 - [`steady_linear_rate`](@ref) — a *steady* linear rate, folded into the integrating factor once, when
   the generator is built.
-- [`prepare_forcing!`](@ref) — advance the strategy's evolving state, once per step, before the stages.
+- [`prepare_forcing!`](@ref) — advance the strategy's evolving state, once per step, before the
+  Runge–Kutta stages.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`project_forcing!`](@ref) — project or rescale the field after the step.
 
@@ -71,11 +72,6 @@ Construction and persistence:
   construction-time object that no step calls.
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
   parameters as one self-describing group (available once `HDF5` is loaded).
-
-A band reaching above the dealias cutoff is inert there for a forcing that multiplies the field — the
-mask holds those modes empty — so construction warns about it; the additive `StochasticOU` would
-inject there instead, and refuses such a band. `highest_shell = Inf` asks for that reach on purpose —
-every retained mode but the mean, on any grid — so it draws no warning; `StochasticOU` refuses it too.
 
 The two fields are forced independently:
 [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) — the `Generator`
@@ -126,9 +122,10 @@ nothing by default. The generator calls the first once, when it is built, and a 
 
 - [`steady_linear_rate`](@ref) — once, when the generator is built: return a per-mode rate that
   stays fixed for the whole run, which the scheme folds exactly into the integrating factor.
-- [`prepare_forcing!`](@ref) — once, before the stages: advance the strategy's own evolving state,
-  such as a stochastic forcing's random process. [`initial_forcing_state`](@ref) creates that state
-  and the run's [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) holds it.
+- [`prepare_forcing!`](@ref) — once, before the Runge–Kutta stages, the intermediate evaluations a
+  scheme makes within one step: advance the strategy's own evolving state, such as a stochastic
+  forcing's random process. [`initial_forcing_state`](@ref) creates that state and the run's
+  [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) holds it.
 - [`add_forcing_source!`](@ref) — at every stage: add a source term to the right-hand side.
 - [`project_forcing!`](@ref) — once, after the completed step: project or rescale the advanced field.
 
@@ -502,9 +499,11 @@ to the field being a vector.
       (whose value still fluctuates with the instantaneous dissipation). Here ``k`` is what the
       forcing sets and the band is free.
 - `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the box's
-  fundamental ``2\\pi/L``. With `highest_shell = Inf` the band is every retained mode but the mean, on
-  any grid, and the two modes of `over` coincide — the mean holds nothing in a field started without
-  one — so a single factor rescales the whole field: the rescaling a physical-space code applies.
+  fundamental ``2\\pi/L``. A finite band reaching past the dealias cutoff draws a warning: the
+  dealiasing keeps those modes empty, so the forcing adds nothing there. With `highest_shell = Inf`
+  the band is every retained mode but the mean, on any grid, and the two modes of `over` coincide —
+  the mean holds nothing in a field started without one — so a single factor rescales the whole
+  field: the rescaling a physical-space code applies.
 
 Neither is a default, because the right answer depends on what the run is calibrated against.
 A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
@@ -616,9 +615,10 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
   The rate is fixed, not fed back from the measured state, so the run settles near that state rather
   than exactly at it.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
-  fundamental ``2\\pi/L``. `highest_shell = Inf` lifts the band limit: every retained mode but the
-  mean is forced, on any grid, and this is Lundgren's forcing itself — the form a physical-space code
-  applies.
+  fundamental ``2\\pi/L``. A finite band reaching past the dealias cutoff draws a warning: the
+  dealiasing keeps those modes empty, so the forcing adds nothing there. `highest_shell = Inf` lifts
+  the band limit: every retained mode but the mean is forced, on any grid, and this is Lundgren's
+  forcing itself — the form a physical-space code applies.
 
 # Fields
 - `band` — the band-pass kernel, evaluated per mode where used rather than stored, as is the rate
@@ -683,10 +683,11 @@ rather than the integrating factor, where freezing it would cost the scheme its 
   forcing may leave it out, and the run then supplies its stationary ``\\varepsilon`` (see
   [`DeferredForcing`](@ref)).
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
-  fundamental ``2\\pi/L``. `highest_shell = Inf` forces every retained mode but the mean, on any grid:
-  the band-free linear forcing of Lundgren (2003, *Linearly forced isotropic turbulence*,
-  *CTR Annual Research Briefs*, 461–473) that physical-space codes apply, with its rate re-solved to
-  hold the injection.
+  fundamental ``2\\pi/L``. A finite band reaching past the dealias cutoff draws a warning: the
+  dealiasing keeps those modes empty, so the forcing adds nothing there. `highest_shell = Inf` forces
+  every retained mode but the mean, on any grid: the band-free linear forcing of Lundgren (2003,
+  *Linearly forced isotropic turbulence*, *CTR Annual Research Briefs*, 461–473) that physical-space
+  codes apply, with its rate re-solved to hold the injection.
 
 !!! note "An empty band is left alone, not driven infinitely hard"
     The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
@@ -775,10 +776,11 @@ in the band if the run depends on the controller taking hold.
   linearity in ``\\varphi`` (at `gain = 0` the settling time never enters the dynamics and the
   marginal law stays legal). Driving the scalar, pass the *flow's* turnover time
   ``2k/(3\\varepsilon)`` explicitly.
-- `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
-  `highest_shell = Inf` forces every retained mode but the mean, on any grid: the band-free linear
-  forcing of Lundgren (2003, *Linearly forced isotropic turbulence*, *CTR Annual Research Briefs*,
-  461–473) that physical-space codes apply, where
+- `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``. A
+  finite band reaching past the dealias cutoff draws a warning: the dealiasing keeps those modes
+  empty, so the forcing adds nothing there. `highest_shell = Inf` forces every retained mode but the
+  mean, on any grid: the band-free linear forcing of Lundgren (2003, *Linearly forced isotropic
+  turbulence*, *CTR Annual Research Briefs*, 461–473) that physical-space codes apply, where
   ``k_{\\mathrm{band}} = k`` — the form Bassenne et al. designed the controller in.
 
 The molecular-dynamics thermostats map the design space exactly, and this controller is the

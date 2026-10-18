@@ -10,7 +10,7 @@ Order   = [:module]
 The forcing supertype and its concrete strategies, grouped by the route each takes through the step —
 which is what decides whether it preserves the scheme's order. [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) supplies a steady rate folded
 into the integrating factor, exactly and for free. [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) and [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) supply
-rates that track the state, so they enter the right-hand side at every stage. [`VarianceRescaling`](@ref GBGHomogeneousTurbulence.Forcing.VarianceRescaling)
+rates that track the state, so they enter the right-hand side at every Runge–Kutta stage. [`VarianceRescaling`](@ref GBGHomogeneousTurbulence.Forcing.VarianceRescaling)
 rescales after the step, which is operator splitting and first-order by construction.
 At every stage [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) adds a random force that does not depend on the flow. One
 implementation serves either the velocity or the scalar.

@@ -154,16 +154,16 @@ unit,words,longest_paragraph,admonitions
 "Cache.jl :: vorticity_physical(cache)",49,48,0
 "Cache.md § The checked reads",27,27,0
 "Cache.md § The observables cache",30,30,0
-"Forcing.jl :: AbstractForcing",404,83,1
-"Forcing.jl :: ConstantPower(domain; injection_rate, lowest_shell = 1, high",453,115,1
+"Forcing.jl :: AbstractForcing",414,90,1
+"Forcing.jl :: ConstantPower(domain; injection_rate, lowest_shell = 1, high",476,137,1
 "Forcing.jl :: DeferredForcing",447,92,0
 "Forcing.jl :: Forcing",536,95,0
-"Forcing.jl :: Linear(domain; rate, lowest_shell = 1, highest_shell = 2)",263,123,0
+"Forcing.jl :: Linear(domain; rate, lowest_shell = 1, highest_shell = 2)",286,146,0
 "Forcing.jl :: NoForcing()",16,15,0
 "Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",944,169,1
 "Forcing.jl :: StochasticOUState",177,67,0
-"Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",901,333,1
-"Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",874,288,1
+"Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",924,356,1
+"Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",897,311,1
 "Forcing.jl :: add_forcing_source!(forcing, forcing_state, N̂, field, domai",288,81,1
 "Forcing.jl :: band_energy_fraction(forcing; reynolds_box = nothing, reynol",224,74,1
 "Forcing.jl :: initial_forcing_state(forcing, field, domain)",130,57,0
@@ -176,7 +176,7 @@ unit,words,longest_paragraph,admonitions
 "Forcing.md § Deferred forcing",22,22,0
 "Forcing.md § Forcing methods",54,54,0
 "Forcing.md § Forcing state",32,32,0
-"Forcing.md § Forcing strategies",100,100,0
+"Forcing.md § Forcing strategies",101,101,0
 "Forcing.md § Persistence",19,19,0
 "Forcing.md § The stationary-state model",39,39,0
 "GBGHomogeneousTurbulence.jl :: GBGHomogeneousTurbulence",121,29,0
