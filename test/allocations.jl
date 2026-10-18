@@ -102,7 +102,7 @@ deposited_cache(sim) = (deposit!(sim); sim.cache)
     @alloc_below bound() truncate_to_band!(STATE.velocity_spectral, DOMAIN)
   end
 
-  @testset "the forcing hooks" begin
+  @testset "the functions a step calls on a forcing" begin
     @alloc_below bound() add_forcing_source!(GENERATOR.conditions.velocity_forcing, nothing, N̂_VECTOR,
                                              STATE.velocity_spectral, DOMAIN, 0.05)
     @alloc_below bound() add_forcing_source!(CONTROLLER, nothing, N̂_VECTOR, STATE.velocity_spectral, DOMAIN, 0.05)

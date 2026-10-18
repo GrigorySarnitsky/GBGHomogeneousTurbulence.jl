@@ -109,7 +109,7 @@ end
 
 
 @testset "traffic audit: every measurable in-place operation, element by element" begin
-  @testset "forcing hooks" begin
+  @testset "forcing calls" begin
     audit(() -> add_forcing_source!(VELOCITY_FORCING, nothing, N̂, Û, DOMAIN, 0.05),
           "add_forcing_source!(ConstantPower)",
           Traffic("dest", field_data(N̂), (P, P)),

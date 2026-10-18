@@ -128,7 +128,7 @@ end
 # `VarianceRescaling` is deliberately included AT first order. It is the reference implementation of
 # Sullivan-Mahalingam-Kerr (1994), a post-step projection, and Lie-Trotter splitting is first order by
 # construction — so the assertion pins the caveat rather than a defect. If someone routes it through
-# the rate or source hook, this test fails and asks them to update the documented caveat with it.
+# `steady_linear_rate` or `add_forcing_source!`, this test fails and asks them to update the documented caveat with it.
 @testset "the scheme keeps its order under forcing, and the one exception is pinned" begin
   T = 0.2
   function measured_order(forcing)

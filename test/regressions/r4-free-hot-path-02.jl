@@ -1,15 +1,15 @@
 # Witness (r4, lane free-hot-path, 02) — the two frozen audit instruments must MODEL what the
-# forcing hooks actually do.
+# forcing calls actually do.
 #
 # Commit f557311 made the empty-band guard RELATIVE (`_band_is_empty(band_value, total_value)`),
 # adding an unconditional whole-field `inner(field, field)` to `project_forcing!(::VarianceRescaling, …)`
-# (src/Forcing.jl:322) and to the then-hook `set_forcing_rate!(::ConstantPower, …)`. Neither
+# (src/Forcing.jl:322) and to `set_forcing_rate!(::ConstantPower, …)`, the rate function of the time. Neither
 # test/optimality_audit.jl's `_syncs` nor test/compute_audit.jl's `_forcing_pass_delta` was updated,
 # so both instruments report FEWER host readbacks and FEWER field-scale passes than the code
 # performs — and both pass green, because each is a hand-written model of src/Forcing.jl rather than
 # a measurement of it.
 #
-# This test measures the real hooks with a counting proxy (the `field` argument is untyped, so the
+# This test measures the real forcing calls with a counting proxy (the `field` argument is untyped, so the
 # proxy dispatches) and holds the audit models against the measurement. It fails on the tree as of
 # f557311 and passes once the models are re-derived (or the guard's reduction is fused away).
 using Test
@@ -54,7 +54,7 @@ CF(f) = CF(f, 0, 0, 0)
 
 PF.field_tensor_order(c::CF) = PF.field_tensor_order(c.f)
 # Forwarded, not counted: an element-type query is not a reduction and crosses no device boundary.
-# The source hook asks for it, so the double must answer — it is part of the field protocol.
+# `add_forcing_source!` asks for it, so the double must answer — it is part of the field protocol.
 PF.field_scalar_type(c::CF) = PF.field_scalar_type(c.f)
 PF.inner(a::CF, b::CF) = (a.inner += 1; PF.inner(a.f, b.f))
 PF.weighted_inner(a::CF, k) = (a.weighted_inner += 1; PF.weighted_inner(a.f, k))
@@ -68,11 +68,11 @@ function measure(forcing, kind)
   random_solenoidal_velocity_spectral!(û, DOMAIN, 0.5;
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(11))
   field = CF(û)
-  # BOTH sides are counted and BOTH are returned. The source hook accumulates into a DIFFERENT field
+  # BOTH sides are counted and BOTH are returned. `add_forcing_source!` accumulates into a DIFFERENT field
   # from the one it reduces, so `convolve!`'s counter lands on the output double — and a witness that
   # returned only the input double would report zero convolutions and pass whatever the code did.
-  # That is exactly how this test went vacuous when the state-dependent forcings moved to the source
-  # hook (2026-08-22): the term it was written to measure quietly stopped being measured.
+  # That is exactly how this test went vacuous when the state-dependent forcings moved to
+  # `add_forcing_source!` (2026-08-22): the term it was written to measure quietly stopped being measured.
   out = CF(new_vector_field_spectral(DOMAIN))
   if kind === :apply
     F.project_forcing!(forcing, field, DOMAIN)
@@ -93,7 +93,7 @@ const LINEAR     = measure(F.Linear(DOMAIN; rate = 0.5),                        
 # every reduction below returns a Julia scalar ⇒ one blocking device→host readback on a GPU
 readbacks(m) = m.field.inner + m.field.weighted_inner
 # A reduction reads the field once. A rescale's `convolve!` is in place: read + write = 2. The
-# source hook's `convolve!` accumulates ACROSS two fields: N̂ read, field read, N̂ write = 3, which is
+# source's `convolve!` (in `add_forcing_source!`) accumulates ACROSS two fields: N̂ read, field read, N̂ write = 3, which is
 # how test/audit_ops.jl prices `Op("add OU source", [out, ou_state], [out])`.
 rescale_passes(m) = readbacks(m) + 2 * m.field.convolve
 source_passes(m)  = readbacks(m) + 3 * m.out.convolve
@@ -108,9 +108,9 @@ model_vector_passes(tag) = PassModel._forcing_pass_delta(tag, :velocity, :RK3).s
 const EVALS_RK3 = 3
 
 
-@testset "the frozen audit models count every reduction the forcing hooks perform" begin
+@testset "the frozen audit models count every reduction the forcing calls perform" begin
   @testset "the measurement is not vacuous" begin
-    # The guard on the guard: if a hook stops convolving where this test expects it to, the pass
+    # The guard on the guard: if a forcing call stops convolving where this test expects it to, the pass
     # comparisons below still balance at zero and certify nothing. Assert the traffic exists first.
     @test BAND.field.convolve > 0
     @test POWER.out.convolve > 0
@@ -118,7 +118,7 @@ const EVALS_RK3 = 3
     # Since the multi-weight fusion (PF decision 72, wired 2026-08-23) the controller answers its
     # three observables — k, k_band, and the dissipation — in ONE fused readback, the same crossing
     # count as `power`'s single band observable: the distinction moved into the weights. The guard
-    # that this hook still reduces at all is the equality itself against the non-zero count.
+    # that this call still reduces at all is the equality itself against the non-zero count.
     @test readbacks(CONTROLLER) == 1 && readbacks(POWER) == 1
   end
   @testset "synchronization ledger (test/optimality_audit.jl `_syncs`)" begin
@@ -135,9 +135,9 @@ const EVALS_RK3 = 3
   end
   # D1 residue (audit-changes round 2): the tag-modelled guard in compute_audit is satisfiable by
   # any wrong number — it proves a tag is PRICED, not that its price is right. The measurement above
-  # is what proves the price; `:linear` was the one hook tag still modelled-but-unmeasured. Its hook
+  # is what proves the price; `:linear` was the one forcing tag still modelled-but-unmeasured. Its rate
   # arms a rate array and reduces NOTHING — zero crossings, zero field passes — and both models must
-  # say so (the armed exponential's per-application read is priced inside the step, not the hook,
+  # say so (the armed exponential's per-application read is priced inside the step, not the forcing call,
   # and is cross-checked by the op-list tests in compute_audit).
   @testset "the :linear tag is measured, not merely modelled" begin
     @test readbacks(LINEAR) == 0

@@ -1,6 +1,6 @@
 # Architecture probe (evidence, not a pass/fail regression test).
 #
-# A `DealiasingStrategy` is consumed by FOUR internal hooks. THREE refuse to answer for a
+# A `DealiasingStrategy` is consumed by FOUR internal functions. THREE refuse to answer for a
 # strategy that has not declared itself (`_retained_nyquist_fraction`, `_build_dealias` — both
 # with concrete-type methods only). The FOURTH, the nonlinear assembly, dispatches on the
 # ABSTRACT supertype (`_velocity_nonlinear!(::DealiasingStrategy, …)` Generator.jl:370,
@@ -17,10 +17,10 @@ using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, DealiasingStrategy
 using GBGHomogeneousTurbulence.Generator: _velocity_nonlinear!, _scalar_nonlinear!
 using GBGHomogeneousTurbulence.SimulationRun: Simulation, advance!
 
-# (1) A brand-new strategy that has declared NOTHING — which hooks answer for it anyway?
+# (1) A brand-new strategy that has declared NOTHING — which functions answer for it anyway?
 struct ProbeBare <: DealiasingStrategy end
 
-println("=== hooks answering for a strategy that declared NOTHING ===")
+println("=== functions answering for a strategy that declared NOTHING ===")
 for (name, answers) in (
       ("_retained_nyquist_fraction", hasmethod(_retained_nyquist_fraction, Tuple{ProbeBare})),
       ("_build_dealias",             hasmethod(_build_dealias, Tuple{ProbeBare, Any, Any, Any, Type{Float64}})),
@@ -30,7 +30,7 @@ for (name, answers) in (
 end
 
 # (2) The maintenance consequence: an author adding a padding (3/2-rule) strategy supplies the
-#     two hooks that HARD-ERROR at them, and never learns the assembly needed one too.
+#     two functions that HARD-ERROR at them, and never learns the assembly needed one too.
 struct ProbePad <: DealiasingStrategy end
 GBGHomogeneousTurbulence.SimulationDomain._retained_nyquist_fraction(::ProbePad) = 2 // 3
 # The resolved cutoff too: a run predicts its κ_max·η from it, and the witness is about the assembly.
@@ -39,7 +39,7 @@ GBGHomogeneousTurbulence.SimulationDomain._build_dealias(::ProbePad, multipliers
   spectral_cutoff(multipliers, T(2 // 3) * (N / 2) * (2π / L))
 
 println()
-println("=== a run on the undeclared strategy, with only the two refusing hooks supplied ===")
+println("=== a run on the undeclared strategy, with only the two refusing functions supplied ===")
 domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π,
                      dealiasing = ProbePad(), element_type = Float64, array_family = Array)
 sim = Simulation(domain; viscosity = 0.05)

@@ -19,21 +19,21 @@ using Random
 using Test
 
 
-# A forcing whose rate hook returns something the integrating factor cannot take — the one mistake
-# left to check once the hook returns its rate (defined at top level: a struct cannot be declared
+# A forcing whose `steady_linear_rate` returns something the integrating factor cannot take — the one mistake
+# left to check once the function returns its rate (defined at top level: a struct cannot be declared
 # inside a testset body).
 struct WrongRateForcing <: AbstractForcing end
 GBGHomogeneousTurbulence.Forcing.steady_linear_rate(::WrongRateForcing, domain::FixedDomain) = zeros(3)
 
 
-# A forcing written to the source hook's pre-2026-09-18 five-argument form, before the forcing's
+# A forcing written to `add_forcing_source!`'s pre-2026-09-18 five-argument form, before the forcing's
 # evolving state reached it. Dispatch would fall straight through to the do-nothing default, so the
 # forcing would be silently ignored.
 struct StaleSourceForcing <: AbstractForcing end
 GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, field, domain, diffusivity) = N̂
 
 
-# A forcing written to the prepare hook's pre-2026-09-17 four-argument form, before the forcing's
+# A forcing written to `prepare_forcing!`'s pre-2026-09-17 four-argument form, before the forcing's
 # evolving state moved into the run's state. Also silently ignored, so also refused.
 struct StalePrepareForcing <: AbstractForcing end
 GBGHomogeneousTurbulence.Forcing.prepare_forcing!(::StalePrepareForcing, field, domain, dt) = nothing
@@ -93,7 +93,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     # The property is unchanged — ⟨u·f⟩ = ε_target — but the route is. `ConstantPower`'s rate depends
     # on the band energy and so is NOT steady, which is why it left the integrating factor (folding a
     # varying A into the exponent integrates ∫A dt by a left-endpoint rectangle rule and costs the
-    # scheme its order). The source hook receives the STAGE field, which is the point.
+    # scheme its order). `add_forcing_source!` receives the STAGE field, which is the point.
     power = 0.3
     forcing = ConstantPower(domain; injection_rate = power, lowest_shell = 1, highest_shell = 2)
     N̂ = new_vector_field_spectral(domain)
@@ -295,12 +295,12 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
       @test generator(f).velocity_rate === nothing
     end
 
-    # Steadiness is structural: the hook is handed no field, so a rate it returns cannot track the
+    # Steadiness is structural: `steady_linear_rate` is handed no field, so a rate it returns cannot track the
     # state. What remains to check is that the integrating factor can take what it returns.
     @test !hasmethod(steady_linear_rate, Tuple{Linear, Any, FixedDomain})
     @test_throws ArgumentError generator(WrongRateForcing())
 
-    # The same contract on the other hook: a strategy still written to the three-argument source
+    # The same contract on `add_forcing_source!`: a strategy still written to the three-argument source
     # form defines a method the run never calls, so construction refuses it rather than integrating
     # an unforced run that reports nothing wrong. Every real strategy must pass unchallenged.
     @test_throws ArgumentError generator(StaleSourceForcing())
@@ -336,7 +336,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     ε = ν * inner_kappa2(û, domain)
     expected = (ε - forcing.gain * (k_whole - target) / forcing.turnover_time) / (2 * k_band)
 
-    # Recover the amplitude the hook applied: N̂ = A·𝟙_band·û, so compare against A·(band-projected û).
+    # Recover the amplitude the source applied: N̂ = A·𝟙_band·û, so compare against A·(band-projected û).
     probe = new_vector_field_spectral(domain); copyto!(field_data(probe), field_data(û))
     convolve!(probe, probe, forcing.band, one(T), zero(T))
     applied = inner(N̂, probe) / inner(probe, probe)

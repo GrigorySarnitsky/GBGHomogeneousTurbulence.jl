@@ -1,12 +1,12 @@
 # Witness: a configured, rate-carrying scalar forcing must never be silently discarded.
-# (Written against the first rate hook, `set_forcing_rate!`, since replaced by `steady_linear_rate`;
+# (Written against the first rate function, `set_forcing_rate!`, since replaced by `steady_linear_rate`;
 # the class — a scalar forcing paired with a scalar-free generator — is what the test still pins.)
 #
 # `ResolvedGenerator(domain, conditions; scalar = false)` allocates no scalar rate array
 # (src/Generator.jl:262), and `prepare!` gates `set_forcing_rate!` on `generator.scalar_rate === nothing`
 # (src/Generator.jl:287-288) — a gate that never consults the state it was handed. Pair such a generator
 # with a scalar-carrying `ResolvedFields` and a `scalar_forcing` that declares `uses_steady_linear_rate`
-# (`ConstantPower`, `Linear`) and the forcing's ONLY hook, `set_forcing_rate!`, is never called: the run
+# (`ConstantPower`, `Linear`) and the forcing's ONLY method, `set_forcing_rate!`, is never called: the run
 # proceeds to completion with the configured forcing having exactly zero effect, and no error is raised
 # anywhere in construction, `prepare!`, `step!`, or `deposit!`.
 #

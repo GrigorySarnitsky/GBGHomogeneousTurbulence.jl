@@ -16,7 +16,7 @@
 #
 # Every op is transcribed from the step! bodies and the generator protocol (src/Propagator.jl,
 # src/Generator.jl, the recovery calls — PF's preserving to_physical! arity and
-# Observables.vorticity_physical! — and the src/Forcing.jl hooks) — re-derive on any change
+# Observables.vorticity_physical! — and the forcing calls of src/Forcing.jl) — re-derive on any change
 # there; a frozen table failing is the reminder. Ops act on SYMBOLIC values (VALUE_CLASS types them);
 # an op's NAME keys its cost entry (compute_audit.jl's OP_COST), so a renamed or added op must get a
 # cost entry in the same commit.
@@ -557,7 +557,7 @@ const UNIFORM_DEPOSIT_SCHEDULE = Holder(
 
 # RESIDENT LINEAR RATE — RETIRED 2026-10-01 (decision 106, on PF decision 92): Linear's steady rate is a
 # radial symbol the integrating factor evaluates per mode, so it is stored nowhere. RATE PROBE retired
-# in the same commit: a rate hook handed no field is steady by construction, so nothing is probed.
+# in the same commit: a `steady_linear_rate` handed no field is steady by construction, so nothing is probed.
 
 # The temporary ledger's field-scale rows (test/temporary_audit.jl, 2026-10-01). Each is listed, not
 # judged: the dispositions are provisional, the remedies candidates, and each is the owner's to decide.
@@ -670,7 +670,7 @@ const OP_COST = Dict(
   # Since the PF adoption (decisions 38/39) every kernel a base op applies is a compressed symbol —
   # a radial closure or O(N) per-axis factors — so no op reads a field-scale configuration array and
   # the `extra` column of this table is empty: the pass ledger IS the physical floor.
-  # the unforced finalize is a no-op (the forcing deltas price the real hooks)
+  # the unforced finalize is a no-op (the forcing deltas price the real forcing calls)
   "finalize"           => _cost(:noop),
   "state re-projection" => _cost(:pointwise),
   # The reality projection (decision 88) touches the folded axis's one or two self-conjugate planes

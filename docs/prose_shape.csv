@@ -115,9 +115,9 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § 3. The organizing frame",26,26,0
 "ARCHITECTURE.md § 4. Modules",94,94,0
 "ARCHITECTURE.md § 4.1 `State` and `SimulationDomain` — the field and the frame",804,337,0
-"ARCHITECTURE.md § 4.2 `Generator` — the evolution, split reversible and irreve",800,349,0
+"ARCHITECTURE.md § 4.2 `Generator` — the evolution, split reversible and irreve",802,349,0
 "ARCHITECTURE.md § 4.3 `Observables` — the measured functions of the state",231,171,0
-"ARCHITECTURE.md § 4.4 `Forcing` — the source",716,391,0
+"ARCHITECTURE.md § 4.4 `Forcing` — the source",718,391,0
 "ARCHITECTURE.md § 4.5 `Propagator` — the map that advances the state in time",476,445,0
 "ARCHITECTURE.md § 4.6 `Particles` — Lagrangian instruments",528,217,0
 "ARCHITECTURE.md § 4.7 `SimulationRun` — the front door",605,505,0
@@ -154,10 +154,10 @@ unit,words,longest_paragraph,admonitions
 "Cache.jl :: vorticity_physical(cache)",49,48,0
 "Cache.md § The checked reads",27,27,0
 "Cache.md § The observables cache",30,30,0
-"Forcing.jl :: AbstractForcing",399,83,1
+"Forcing.jl :: AbstractForcing",404,83,1
 "Forcing.jl :: ConstantPower(domain; injection_rate, lowest_shell = 1, high",453,115,1
 "Forcing.jl :: DeferredForcing",447,92,0
-"Forcing.jl :: Forcing",510,217,0
+"Forcing.jl :: Forcing",536,95,0
 "Forcing.jl :: Linear(domain; rate, lowest_shell = 1, highest_shell = 2)",263,123,0
 "Forcing.jl :: NoForcing()",16,15,0
 "Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",944,169,1
@@ -183,7 +183,7 @@ unit,words,longest_paragraph,admonitions
 "GBGHomogeneousTurbulence.md § GBGHomogeneousTurbulence",15,15,0
 "Generator.jl :: FlowConditions(; viscosity, schmidt, velocity_forcing, scala",312,74,2
 "Generator.jl :: Generator",170,97,0
-"Generator.jl :: ResolvedGenerator(domain, conditions; scalar = false)",542,225,1
+"Generator.jl :: ResolvedGenerator(domain, conditions; scalar = false)",543,226,1
 "Generator.jl :: finalize!(generator, state, domain)",109,81,0
 "Generator.jl :: prepare!(generator, state, domain, dt)",100,58,0
 "Generator.jl :: scalar_diffusivity(conditions) -> Float64",15,12,0

@@ -337,8 +337,8 @@ protocol —
 (dealiased nonlinear term plus additive forcing source), `velocity_integrating_factor` / `scalar_integrating_factor` supply
 each field's exact linear subflow, and `finalize!` closes the step (the post-step forcing projections).
 The required core is `velocity_rhs!` and `velocity_integrating_factor`; `prepare!` and `finalize!`
-always run, and do nothing observable only when the configured forcing's own hooks are the
-`AbstractForcing` defaults. A scheme consumes the physics only through this protocol, so it can never assemble the
+always run, and do nothing observable only when the configured forcing leaves `prepare_forcing!` and `project_forcing!` at
+their `AbstractForcing` defaults. A scheme consumes the physics only through this protocol, so it can never assemble the
 right-hand side from a mismatched intermediate — the class of the stage-ordering bug that motivated the
 reification (§11 decisions 29, 31).
 
@@ -392,15 +392,15 @@ state the first advances; each defaults to doing nothing:
 - `add_forcing_source!` — add an additive source at each Runge–Kutta stage;
 - `project_forcing!` — apply a post-step projection or rescale.
 
-The hooks form one lifecycle with a fixed order — `steady_linear_rate` once, when the generator is
+A step calls the four in a fixed order — `steady_linear_rate` once, when the generator is
 built; then per step `prepare_forcing!` before the stages, `add_forcing_source!` at every stage,
 `project_forcing!` after the completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
 part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
-hooks need; none receives the scheme's buffers (§11 decision 32). What a strategy *evolves* is not
+methods need; none receives the scheme's buffers (§11 decision 32). What a strategy *evolves* is not
 scratch: it lives in the `modeled` slot of `ResolvedFields`, so that one record is the whole
 evolving state of the run (§8's open-systems reading; §11 decisions 23 and 90).
 
-Which hook a strategy uses is not an implementation detail: it decides whether the strategy preserves
+Which of the four a strategy defines is not an implementation detail: it decides whether the strategy preserves
 the scheme's order in time. A rate folded into ``\mathcal{E}`` is integrated exactly, but only a
 *steady* rate can be — freezing a state-dependent one at the step's start is the left-endpoint
 rectangle rule on ``\int A\,\mathrm dt``, which is first-order however good the scheme is, and a
@@ -466,7 +466,7 @@ Method (§3).
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``, with grid spacing ``\Delta x``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
 - **Two linear constraints are re-imposed on the advanced state at every step's exit**, after the
-  forcing's post-step hook: the divergence-free condition, by the field library's
+  forcing's post-step projection: the divergence-free condition, by the field library's
   `helmholtz_projection!` (decision 61), and the reality condition on the real-to-complex layout's
   self-conjugate planes, by its `reality_projection!` (decision 88). Neither is held by the
   discretisation by construction; both are seeded at round-off and, for the reality condition,

@@ -39,7 +39,7 @@ using Test
   field_data(N̂) .= 0
   add_forcing_source!(forcing, nothing, N̂, φ̂, domain, κ)
 
-  # The three reductions, computed independently of the hook's fused route, at factor 1:
+  # The three reductions, computed independently of `add_forcing_source!`'s fused route, at factor 1:
   whole = real(inner(φ̂, φ̂))                                   # ⟨φ²⟩, the quantity held
   probe = new_scalar_field_spectral(domain)
   copyto!(field_data(probe), field_data(φ̂))
@@ -50,7 +50,7 @@ using Test
 
   expected = (χ - forcing.gain * (whole - target) / forcing.turnover_time) / (2 * band_variance)
 
-  # Recover the amplitude the hook applied: N̂ = A·band·φ̂, so project onto the band-projected φ̂.
+  # Recover the amplitude the source applied: N̂ = A·band·φ̂, so project onto the band-projected φ̂.
   applied = real(inner(N̂, probe)) / real(inner(probe, probe))
   @test isapprox(applied, expected; rtol = 1e-10)
 

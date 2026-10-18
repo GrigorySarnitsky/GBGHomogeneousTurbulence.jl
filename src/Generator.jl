@@ -193,7 +193,7 @@ function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
 end
 
 
-# The rate a forcing folds into the integrating factor, or `nothing`. The hook is handed no field, so
+# The rate a forcing folds into the integrating factor, or `nothing`. `steady_linear_rate` is handed no field, so
 # a rate is steady by construction (decision 106); what is checked here is only that the integrating
 # factor can take it — a radial kernel, evaluated per mode, or a stored scalar field.
 function _steady_rate(domain::FixedDomain, forcing)
@@ -206,21 +206,21 @@ function _steady_rate(domain::FixedDomain, forcing)
 end
 
 
-# Does this forcing define a hook the run cannot call — one written to an earlier, shorter form of it?
+# Does this forcing define a method the run cannot call — one written to an earlier, shorter form of the function?
 # `add_forcing_source!` gained the stage field and the diffusivity, `prepare_forcing!` the forcing's
 # evolving state. The arity is the whole question, so the method table is enumerated exactly as the
 # rate probe does it, and for the same reason: `which` resolves a call, not a definition.
-function _defines_stale_hook(hook, forcing, arguments::Int)
+function _defines_outdated_method(f, forcing, arguments::Int)
   overrides = false
   callable = false
-  for m in methods(hook, Tuple{typeof(forcing), Vararg{Any}})
+  for m in methods(f, Tuple{typeof(forcing), Vararg{Any}})
     signature = Base.unwrap_unionall(m.sig)
     length(signature.parameters) >= 2 || continue
     accepted = signature.parameters[2]
     accepted isa TypeVar && (accepted = accepted.ub)
     accepted === AbstractForcing && continue        # the do-nothing fallback itself
     overrides = true
-    # the function type plus the hook's arguments, or a vararg that can absorb them
+    # the function type plus the function's arguments, or a vararg that can absorb them
     (m.isva || length(signature.parameters) >= arguments + 1) && (callable = true)
   end
   # The question is whether a callable method EXISTS, not whether every method is one. Julia
@@ -293,7 +293,7 @@ you.
   through `displaced_velocity_current` that the scratch is still fresh. The record alone can only
   force a rebuild.
 - `velocity_forcing_state`, `scalar_forcing_state` — each forcing's evolving state for the step
-  `prepare!` opened, taken from the run's state so the per-stage forcing source hook receives it; `nothing` for a
+  `prepare!` opened, taken from the run's state so the forcing's per-stage source term can read it; `nothing` for a
   forcing that evolves none.
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
@@ -308,7 +308,7 @@ mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   # stage's velocity, and the mismatch is silent.
   displaced_velocity_source::Any
   # Each forcing's evolving state for the step `prepare!` opened, taken from the run's state so the
-  # per-stage source hook can read it: the right-hand-side verbs are handed a stage FIELD, not the
+  # per-stage source term can read it: the right-hand-side verbs are handed a stage FIELD, not the
   # record it came from. Refreshed every step beside the scratch above, and `nothing` for a strategy
   # with no state of its own.
   velocity_forcing_state::Any
@@ -325,22 +325,22 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
                         "but this generator is built with `scalar = false` and assembles no scalar " *
                         "right-hand side, so the forcing could never be applied. Pass " *
                         "`scalar = true`, or leave `scalar_forcing` at `NoForcing()`."))
-  # The source hook gained the stage field and the diffusivity when state-dependent forcings moved
-  # onto it, and the prepare hook the forcing's evolving state when that state moved into the run's
+  # `add_forcing_source!` gained the stage field and the diffusivity when state-dependent forcings
+  # moved onto it, and `prepare_forcing!` the forcing's evolving state when that state moved into the run's
   # state. A strategy still written to an old form defines a method the run never calls —
   # dispatch simply falls through to the do-nothing default — so the forcing goes silently
   # unapplied. Refuse at construction.
   for forcing in (conditions.velocity_forcing, conditions.scalar_forcing)
-    _defines_stale_hook(prepare_forcing!, forcing, 5) &&
+    _defines_outdated_method(prepare_forcing!, forcing, 5) &&
       throw(ArgumentError("$(nameof(typeof(forcing))) defines prepare_forcing! with fewer than " *
-                          "five arguments. The hook is now " *
+                          "five arguments. Its form is now " *
                           "`prepare_forcing!(forcing, forcing_state, field, domain, dt)` — it is " *
                           "handed the forcing's evolving state, which the run's `ResolvedFields` keeps " *
                           "(see `initial_forcing_state`). A method written to the old form is never " *
                           "called, so the forcing would be silently ignored."))
-    _defines_stale_hook(add_forcing_source!, forcing, 6) &&
+    _defines_outdated_method(add_forcing_source!, forcing, 6) &&
       throw(ArgumentError("$(nameof(typeof(forcing))) defines add_forcing_source! with fewer than " *
-                          "six arguments. The hook is now " *
+                          "six arguments. Its form is now " *
                           "`add_forcing_source!(forcing, forcing_state, N̂, field, domain, diffusivity)` " *
                           "— it is called at every Runge-Kutta stage and is handed the forcing's " *
                           "evolving state, that stage's own field, and the diffusivity acting on it. " *
@@ -360,7 +360,7 @@ end
     prepare!(generator, state, domain, dt)
 
 Open a step of the generator: advance each forcing's evolving state, kept in the run's state, once
-(its per-step [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!) hook). A
+(the forcing's [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!)). A
 scheme calls this once before its Runge–Kutta stages; the stage evaluations then consume what it
 prepared. The steady per-mode linear forcing rates are not touched here: they were fixed once, when
 the generator was built.
@@ -368,7 +368,7 @@ the generator was built.
 # Arguments
 - `generator` — the [`ResolvedGenerator`](@ref) being opened.
 - `state` — the start-of-step [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields)
-  the forcing hooks read, whose forcing states they advance.
+  the forcings read, whose evolving states they advance.
 - `domain` — the [`FixedDomain`](@ref) the rates are formed on.
 - `dt` — the timestep the forcings prepare for.
 
@@ -390,7 +390,7 @@ end
     finalize!(generator, state, domain)
 
 Close a step of the generator: apply each of its forcings' post-step projections (the
-[`project_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.project_forcing!) hook — e.g. the energy
+[`project_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.project_forcing!) — e.g. the energy
 rescale of a [`VarianceRescaling`](@ref GBGHomogeneousTurbulence.Forcing.VarianceRescaling)) to the
 advanced state, velocity first, then the scalar when the run carries one. A scheme calls this once
 after its final stage, so everything that follows the step — the diagnostics, the derived
@@ -459,7 +459,7 @@ becomes
 Here ``\\boldsymbol{f}`` is the forcing. The term computed is the spectral image of ``-\\mathbb{P} (\\boldsymbol{\\omega}\\times\\boldsymbol{u})``,
 dealiased by the domain's [`DealiasingStrategy`](@ref), plus the per-stage additive source of the
 generator's velocity forcing (its
-[`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!) hook). Its minus
+[`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!)). Its minus
 sign costs nothing: the product is formed as the negated Lamb vector
 ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, operands in the order that carries the sign.
 
@@ -620,7 +620,7 @@ mode untouched.
 The term is computed pseudospectrally as
 ``- \\operatorname{dealias}\\bigl(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\bigr)``,
 plus the per-stage additive source of the generator's scalar forcing (its
-[`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!) hook).
+[`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!)).
 
 The dealiasing strategy controls the aliasing of the quadratic product. A mask strategy
 ([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u_consumed`, `φ`, leaving `û` and

@@ -5,7 +5,7 @@
 # on its own:  julia --project=. test/<module>.jl
 
 # First, before any test module adds methods to the package's functions: a test fixture that
-# deliberately defines a stale hook signature would otherwise read as an ambiguity in the package.
+# deliberately defines an outdated forcing signature would otherwise read as an ambiguity in the package.
 module MethodParityTests;   include("method_parity.jl");   end
 module VelocitySliceTests; include("velocity_slice.jl"); end
 module ObservablesCacheTests; include("observables_cache.jl"); end

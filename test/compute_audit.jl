@@ -189,9 +189,9 @@ const FUSION_GAP_HOLDERS = Dict(
 # reductions, per-mode multiplies, the integrating-factor rate, or a band-sized write.
 _forcing_transform_delta(tag, slot) = (c2r = 0, r2c = 0)
 
-# Pass deltas per forcing hook, derived from src/Forcing.jl (the OU-velocity column is
+# Pass deltas per forcing call, derived from src/Forcing.jl (the OU-velocity column is
 # cross-checked against its op list below; the rest are frozen by derivation). Every band kernel is
-# a lazy radial symbol since the PF adoption, so no hook reads a stored kernel; a linear rate is a
+# a lazy radial symbol since the PF adoption, so no forcing call reads a stored kernel; a linear rate is a
 # radial symbol too since decision 106, evaluated in register inside the fused exponential.
 #   band  — project_forcing!: weighted_inner(field, band) [field read] + the in-band rescale
 #           convolve [field r/w].

@@ -5,7 +5,7 @@
 #     a per-mode A(k) folded into the integrating factor, so the linear operator becomes A(k) - D|k|².
 #     Exact, and free. BOTH words are load-bearing: the exponent is ∫A dt, so a rate that varies over
 #     the step is integrated by a left-endpoint rectangle rule — local error O(Δt²), and the whole
-#     iteration collapses to FIRST order however good the scheme is. The hook is handed no field, so
+#     iteration collapses to FIRST order however good the scheme is. It is handed no field, so
 #     what it returns cannot depend on the state (decision 106). Only `Linear` qualifies.
 #   * `add_forcing_source!` — a source added at each stage, at the STAGE state. This is where a
 #     state-dependent rate belongs: the scheme's own order conditions then apply to it, with nothing
@@ -35,14 +35,17 @@
 The interchangeable energy-injection strategies — one implementation each serving both the velocity
 and the scalar through tensor-order-generic field operators.
 
-The lifecycle, four hook methods a strategy may act on, each defaulting to doing nothing:
+Every strategy is an [`AbstractForcing`](@ref). It enters the time step through four functions, each
+called at its own point of the step and each doing nothing unless the strategy defines a method for it
+(in software terms, *hooks*: functions a framework calls at fixed points, which a plug-in may supply):
 
-- [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
-- [`initial_forcing_state`](@ref) — create a forcing's initial state.
-- [`prepare_forcing!`](@ref) — advance that state, once per step.
-- [`steady_linear_rate`](@ref) — supply a *steady* linear rate, folded into the integrating factor.
+- [`steady_linear_rate`](@ref) — a *steady* linear rate, folded into the integrating factor once, when
+  the generator is built.
+- [`prepare_forcing!`](@ref) — advance the strategy's evolving state, once per step, before the stages.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`project_forcing!`](@ref) — project or rescale the field after the step.
+
+A strategy that has an evolving state gets it once, from [`initial_forcing_state`](@ref).
 
 The strategies; each but `NoForcing` acts on a *band*, an annulus of integer Fourier shells:
 
@@ -65,7 +68,7 @@ Construction and persistence:
 
 - [`DeferredForcing`](@ref) — the keyword form of a strategy, built into the concrete strategy once the
   [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) has built the domain; a
-  construction-time object, not a lifecycle hook.
+  construction-time object that no step calls.
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
   parameters as one self-describing group (available once `HDF5` is loaded).
 
@@ -129,8 +132,8 @@ _band_is_empty(band_value, whole_value) =
 This is the supertype of the energy-injection strategies — the interchangeable ways a run drives its
 velocity or its scalar.
 
-A strategy implements whichever of four hooks it needs; each defaults to doing nothing. The
-generator calls the first once, when it is built, and a step calls the other three in a fixed order:
+A strategy enters the time step through four functions and defines whichever it needs; each does
+nothing by default. The generator calls the first once, when it is built, and a step calls the other three in a fixed order:
 
 - [`steady_linear_rate`](@ref) — once, when the generator is built: return a per-mode rate that
   stays fixed for the whole run, which the scheme folds exactly into the integrating factor.
@@ -148,15 +151,15 @@ integrating factor holds a rate fixed for the whole step, so a rate re-solved fr
 through `add_forcing_source!` instead; freezing it in the integrating factor would drop the scheme to
 first order.
 
-The rate hook is handed neither the field nor the time, so the rate it returns cannot depend on the
+The rate function is handed neither the field nor the time, so the rate it returns cannot depend on the
 state: it is steady by construction.
 
-Each mutating hook returns the argument it mutated: `add_forcing_source!` the right-hand side,
-`project_forcing!` the field. The hook `prepare_forcing!` returns
+Each mutating function returns the argument it mutated: `add_forcing_source!` the right-hand side,
+`project_forcing!` the field. The function `prepare_forcing!` returns
 `nothing`, having advanced the state it was handed in place.
 
-A hook runs inside the time loop, which is allocation-free at field scale, so a strategy allocates
-whatever scratch it needs once, when it is built, and its hooks touch only that scratch and the
+The four run inside the time loop, which is allocation-free at field scale, so a strategy allocates
+whatever scratch it needs once, when it is built, and its methods touch only that scratch and the
 arguments they are given.
 
 !!! warning "One instance per forced field, for a strategy with mutable bookkeeping"
@@ -281,7 +284,7 @@ representation holding real values.
 *Steady*, not merely linear, is the load-bearing word: a per-mode rate re-solved from the state each
 step must not be returned here. Freezing it would be the left-endpoint rectangle rule on
 ``\\int A\\,\\mathrm{d}t``, dropping the scheme to first order; such a forcing goes through
-[`add_forcing_source!`](@ref) instead. The hook is handed no field, so a rate it returns is steady by
+[`add_forcing_source!`](@ref) instead. This function is handed no field, so a rate it returns is steady by
 construction.
 """
 steady_linear_rate(::AbstractForcing, domain::FixedDomain) = nothing
@@ -340,8 +343,8 @@ Everything the stages will need must be ready when this returns, since
 
 # Arguments
 - `forcing` — the strategy whose state advances.
-- `forcing_state` — the state [`initial_forcing_state`](@ref) created once and this hook has
-  advanced on every step since.
+- `forcing_state` — the state [`initial_forcing_state`](@ref) created once, advanced by this call
+  on every step since.
   It is `nothing` for a strategy that evolves no state.
 - `field` — the start-of-step velocity or scalar, in spectral representation.
 - `domain` — the [`FixedDomain`](@ref) the run advances on.
@@ -356,16 +359,16 @@ prepare_forcing!(::AbstractForcing, forcing_state, field, domain::FixedDomain, d
 Add the strategy `forcing`'s source term to the assembled right-hand side `N̂`, at every Runge–Kutta
 stage. The default does nothing.
 
-Two kinds of strategy come through this hook. One measures the stage's own `field` and sets its
+Two kinds of strategy add a source here. One measures the stage's own `field` and sets its
 amplitude from it — `ConstantPower` and `VarianceController` do, and this is the only route open to
 them, since a state-dependent rate frozen once per step would drop the scheme to first order. The
 other carries a source that does not read the field at all: [`StochasticOU`](@ref)'s random process,
-already advanced for this step by [`prepare_forcing!`](@ref), which this hook only writes into `N̂`.
+already advanced for this step by [`prepare_forcing!`](@ref), which this call only writes into `N̂`.
 
 # Arguments
 - `forcing` — the strategy adding the source.
 - `forcing_state` — its evolving state as `prepare_forcing!` left it this step, or `nothing` for a
-  strategy without one. This hook reads it and does not advance it.
+  strategy without one. This call reads it and does not advance it.
 - `N̂` — the assembled right-hand side, accumulated into.
 - `field` — this stage's own velocity ``\\hat{\\boldsymbol{u}}`` or scalar ``\\hat{\\varphi}``, in
   spectral representation, whichever the strategy drives.
@@ -1244,8 +1247,8 @@ end
 
 A [`StochasticOU`](@ref) forcing's evolving state holds two things: the force itself, as a field in
 spectral representation on the forcing's companion grid, and the number of increments drawn so far.
-The hook [`initial_forcing_state`](@ref) creates it, [`prepare_forcing!`](@ref) advances it in place every step,
-and a run keeps it as the `modeled` entry of
+It is created by [`initial_forcing_state`](@ref), advanced in place every step by
+[`prepare_forcing!`](@ref), and kept by a run as the `modeled` entry of
 [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) for the forced field. There is no
 reason to build one by hand.
 

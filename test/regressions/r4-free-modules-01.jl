@@ -83,7 +83,7 @@ end
   # And the rescale actually happened, so the count above is not from an early return.
   @test COUNTS[:convolve] == 1
 
-  # The total host-crossing reductions the forcing hook issues, which the frozen SYNC_LEDGER's
+  # The total host-crossing reductions the forcing issues, which the frozen SYNC_LEDGER's
   # `:band_total` row prices at 1 (the fused band+total observable).
   @test COUNTS[:inner] + COUNTS[:weighted_inner] == 1
 end
