@@ -1120,9 +1120,6 @@ end
 """
     StochasticOU(domain; forcing_variance, correlation_time, lowest_shell = 1,
                  highest_shell = 2, seed = rand(Int))
-    StochasticOU(; forcing_variance = nothing, correlation_time = nothing,
-                 correlation_time_in_box_units = nothing, lowest_shell = 1,
-                 highest_shell = 2, seed = nothing)
 
 The stochastic forcing of Eswaran & Pope (1988), built on the [`FixedDomain`](@ref) `domain`: a random term,
 correlated over a finite time, added to the right-hand side on a band of low wavenumbers.

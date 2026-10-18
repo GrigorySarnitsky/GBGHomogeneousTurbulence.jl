@@ -465,7 +465,7 @@ sign costs nothing: the product is formed as the negated Lamb vector
 
 A mask
 strategy (`TwoThirds`, `HouLi`) forms the term once from `u`, `ω` and multiplies by the low-pass `domain.dealias`,
-leaving `û` unused; [`PhaseShift`](@ref) forms it twice — from `u`, `ω`, and from the fields
+leaving `û` unused; `PhaseShift` forms it twice — from `u`, `ω`, and from the fields
 recovered on a grid displaced by half a cell (using `û` and the generator's displaced-evaluation
 scratch) — averages the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
 
@@ -624,7 +624,7 @@ plus the per-stage additive source of the generator's scalar forcing (its
 
 The dealiasing strategy controls the aliasing of the quadratic product. A mask strategy
 ([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u_consumed`, `φ`, leaving `û` and
-`φ̂` unused. [`PhaseShift`](@ref) instead averages it with the flux recovered on a grid displaced
+`φ̂` unused. `PhaseShift` instead averages it with the flux recovered on a grid displaced
 half a cell — using `φ̂` and the generator's displaced-evaluation scratch, and reading the displaced
 velocity the same stage's [`velocity_rhs!`](@ref) left fresh there (a bare `scalar_rhs!` with no
 preceding velocity evaluation rebuilds it from `û` instead) — before the spherical truncation.

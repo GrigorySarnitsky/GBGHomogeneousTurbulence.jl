@@ -58,7 +58,7 @@ interpolate_at_particles!
 
 The memory-locality order the gathers visit the tracers in — a value-preserving accelerator: the
 interpolated values are bit-identical with or without it, only the visiting order changes. A run
-builds and refreshes it for you (the `traversal_mode` of a `ParticleTracking`); the type and
+builds and refreshes it for you (the `traversal_mode` of a [`ParticleTracking`](@ref GBGHomogeneousTurbulence.SimulationRun.ParticleTracking)); the type and
 its rebuild verb are here for a caller driving the tracking loop by hand, or refreshing on a chosen
 cadence from a [`run!`](@ref GBGHomogeneousTurbulence.SimulationRun.run!) callback.
 

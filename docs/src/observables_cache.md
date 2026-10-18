@@ -221,7 +221,9 @@ a real decision: a vector field on a grid of ``N`` points per axis is ``3N^{3}``
 precision and 192 MiB in single, so a callback materializing a field-sized diagnostic is buying a
 third of a gigabyte; a number costs nothing worth counting.
 
-For scale: a velocity-only run under `TwoThirds` or `HouLi` carries six vector-shaped fields — four
+For scale: a velocity-only run under
+[`TwoThirds`](@ref GBGHomogeneousTurbulence.SimulationDomain.TwoThirds) or
+[`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) carries six vector-shaped fields — four
 in spectral representation and two in physical — about 2.3 GiB at ``256^{3}`` in double precision,
 before the scalar-shaped registers. It carried ten before this design landed: two physical vectors
 existed only because a slot and its producer's register were separate arrays, a spectral one was the
@@ -236,7 +238,7 @@ every array shape.
 One configuration fixes the system. The chapter's running instance is the default one — a mask
 dealiasing rule (`TwoThirds` or `HouLi`, each removing the aliased wavenumbers by a per-wavenumber
 multiplication), a three-stage scheme, the default constant-power velocity forcing, an adaptive
-timestep — and the departures from it are priced in place: `PhaseShift` and another stage count
+timestep — and the departures from it are priced in place: [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) and another stage count
 in §2.3, a hand-fixed ``\Delta t`` in §1.4. Whatever the configuration, those axes fix the whole
 of an iteration's work —
 stopping belongs to the observation (§1.3), and nothing a reader does changes what an iteration
@@ -339,8 +341,8 @@ reaches. Both are ``M\times3`` arrays, for ``M`` tracers, interpolated with the 
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
 A multistep particle integration scheme looks further back, and the cache is where that history lives: built
-with `history_depth` above 1 it keeps a bounded ring of past velocity samples —
-`history_depth` minus one further ``M\times3`` arrays beyond the current slot — which [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)
+with `history_depth > 1` it keeps a bounded ring of past velocity samples —
+`history_depth - 1` further ``M\times3`` arrays beyond the current slot — which [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)
 integrates over and a reposition made outside the iteration discards ([`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!)). The history rides
 the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
 latest deposit, and it exists here rather than in the scheme's registers because the object that
