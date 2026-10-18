@@ -58,7 +58,7 @@ using ..Cache: ObservablesCache, check_deposits,
                advance_fields_epoch!,
                velocity_physical, max_speed, velocity_at_particles
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
-                     scalar_dissipation, energy_spectrum, integral_length, derivative_skewness,
+                     scalar_dissipation, energy_spectrum, derivative_skewness,
                      reynolds_box, reynolds_taylor, kolmogorov_length
 using ..Forcing: AbstractForcing, DeferredForcing, NoForcing, ConstantPower, VarianceRescaling,
                  VarianceController, StochasticOU, StochasticOUState, initial_forcing_state,
