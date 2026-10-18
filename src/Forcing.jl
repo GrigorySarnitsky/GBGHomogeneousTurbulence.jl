@@ -73,7 +73,7 @@ Construction and persistence:
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
   parameters as one self-describing group (available once `HDF5` is loaded).
 
-The two fields are forced independently:
+The velocity and the scalar are forced independently:
 [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) — the `Generator`
 parameter record bundling the viscosity, the Schmidt number, and the two forcings — takes a
 separate `velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
