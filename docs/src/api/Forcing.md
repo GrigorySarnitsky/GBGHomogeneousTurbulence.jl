@@ -56,15 +56,18 @@ DeferredForcing
 
 ## Forcing methods
 
-This section documents the method that creates a strategy's evolving state, then the four methods a strategy may implement
-(each a no-op by default): the per-step [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!), the rate [`steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.steady_linear_rate) the
-generator asks for once when it is built, and the per-stage and post-step functions in the order [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!)
-calls them.
+This section documents the method that creates a strategy's evolving state, then the four methods a
+strategy may define, each doing nothing by default, in the order a run calls them:
+[`steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.steady_linear_rate), once, when the
+generator is built; [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!),
+once per step; [`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!), at
+every Runge–Kutta stage; and [`project_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.project_forcing!),
+after the step.
 
 ```@docs
 initial_forcing_state
-prepare_forcing!
 steady_linear_rate
+prepare_forcing!
 add_forcing_source!
 project_forcing!
 ```
