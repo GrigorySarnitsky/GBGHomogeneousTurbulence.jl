@@ -6,6 +6,8 @@
         "2026-10-04-documentation-review-01-004",
         "2026-10-04-documentation-review-01-006"
     ],
+    "covered": [
+    ],
     "first_commit": "f2ee28d9cae9d81315dbe5439a457686e2157325",
     "dropped": 0,
     "id": "2026-10-04-documentation-review-01",
@@ -43,9 +45,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-010-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "Already fixed by 07f0cd34 on the owner's ruling of 2026-10-09: the seeders' required inputs are positional; the timestep, the scalar flag and the helpers' inputs stay keywords under the keyword-default rule (owner, 2026-10-19).",
             "context": "Making the seeders' energy and envelope, the timestep of advance!/run!/warmup!, the stationary-state helpers' inputs and allocate_buffers' scalar flag positional changes the public API (code), or else needs a Switch in the config — either is the owner's decision.",
-            "answer": null
+            "answer": "not a defect"
         },
         {
             "options": [
@@ -9402,6 +9404,7 @@
     ],
     "fixes": [
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-001",
             "with_diff": null,
@@ -9412,6 +9415,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-002",
             "with_diff": null,
@@ -9422,6 +9426,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-003",
             "with_diff": null,
@@ -9432,6 +9437,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "LINE_ONLY",
             "finding": "2026-10-04-documentation-review-01-005",
             "with_diff": null,
@@ -9442,6 +9448,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-007",
             "with_diff": null,
@@ -9452,6 +9459,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-008",
             "with_diff": null,
@@ -9462,6 +9470,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "LINE_ONLY",
             "finding": "2026-10-04-documentation-review-01-009",
             "with_diff": null,
@@ -9472,6 +9481,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-011",
             "with_diff": null,
@@ -9482,6 +9492,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-012",
             "with_diff": null,
@@ -9492,6 +9503,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-013",
             "with_diff": null,
@@ -9502,6 +9514,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-014",
             "with_diff": null,
@@ -9512,6 +9525,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-015",
             "with_diff": null,
@@ -9522,6 +9536,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-016",
             "with_diff": null,
@@ -9532,6 +9547,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-017",
             "with_diff": null,
@@ -9542,6 +9558,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-018",
             "with_diff": null,
@@ -9552,6 +9569,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-019",
             "with_diff": null,
@@ -9562,6 +9580,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-020",
             "with_diff": null,
@@ -9572,6 +9591,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-022",
             "with_diff": null,
@@ -9582,6 +9602,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-024",
             "with_diff": null,
@@ -9592,6 +9613,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-025",
             "with_diff": null,
@@ -9602,6 +9624,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-026",
             "with_diff": null,
@@ -9612,6 +9635,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-027",
             "with_diff": null,
@@ -9622,6 +9646,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-028",
             "with_diff": null,
@@ -9632,6 +9657,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-029",
             "with_diff": null,
@@ -9642,6 +9668,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-030",
             "with_diff": null,
@@ -9652,6 +9679,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-031",
             "with_diff": null,
@@ -9662,6 +9690,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-032",
             "with_diff": null,
@@ -9672,6 +9701,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-033",
             "with_diff": null,
@@ -9682,6 +9712,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-035",
             "with_diff": null,
@@ -9692,6 +9723,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-037",
             "with_diff": null,
@@ -9702,6 +9734,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-039",
             "with_diff": null,
@@ -9712,6 +9745,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-040",
             "with_diff": null,
@@ -9722,6 +9756,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-042",
             "with_diff": null,
@@ -9732,6 +9767,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-045",
             "with_diff": null,
@@ -9742,6 +9778,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-046",
             "with_diff": null,
@@ -9752,6 +9789,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-047",
             "with_diff": null,
@@ -9762,6 +9800,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-048",
             "with_diff": null,
@@ -9772,6 +9811,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-049",
             "with_diff": null,
@@ -9782,6 +9822,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-050",
             "with_diff": null,
@@ -9792,6 +9833,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-051",
             "with_diff": null,
@@ -9802,6 +9844,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-052",
             "with_diff": null,
@@ -9812,6 +9855,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-053",
             "with_diff": null,
@@ -9822,6 +9866,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "LINE_ONLY",
             "finding": "2026-10-04-documentation-review-01-054",
             "with_diff": null,
@@ -9832,6 +9877,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-055",
             "with_diff": null,
@@ -9842,6 +9888,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-056",
             "with_diff": null,
@@ -9852,6 +9899,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-057",
             "with_diff": null,
@@ -9862,6 +9910,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-059",
             "with_diff": null,
@@ -9872,6 +9921,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-060",
             "with_diff": null,
@@ -9882,6 +9932,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "LINE_ONLY",
             "finding": "2026-10-04-documentation-review-01-061",
             "with_diff": null,
@@ -9892,6 +9943,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-063",
             "with_diff": null,
@@ -9902,6 +9954,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-064",
             "with_diff": null,
@@ -9912,6 +9965,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-065",
             "with_diff": null,
@@ -9922,6 +9976,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-066",
             "with_diff": null,
@@ -9932,6 +9987,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-067",
             "with_diff": null,
@@ -9942,6 +9998,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-068",
             "with_diff": null,
@@ -9952,6 +10009,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-069",
             "with_diff": null,
@@ -9962,6 +10020,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-070",
             "with_diff": null,
@@ -9972,6 +10031,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-071",
             "with_diff": null,
@@ -9982,6 +10042,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-072",
             "with_diff": null,
@@ -9992,6 +10053,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-074",
             "with_diff": null,
@@ -10002,6 +10064,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-075",
             "with_diff": null,
@@ -10012,6 +10075,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-076",
             "with_diff": null,
@@ -10022,6 +10086,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-077",
             "with_diff": null,
@@ -10032,6 +10097,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-078",
             "with_diff": null,
@@ -10042,6 +10108,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-080",
             "with_diff": null,
@@ -10052,6 +10119,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-081",
             "with_diff": null,
@@ -10062,6 +10130,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-082",
             "with_diff": null,
@@ -10072,6 +10141,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "LINE_ONLY",
             "finding": "2026-10-04-documentation-review-01-083",
             "with_diff": null,
@@ -10082,6 +10152,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-084",
             "with_diff": null,
@@ -10092,6 +10163,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-085",
             "with_diff": null,
@@ -10102,6 +10174,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-086",
             "with_diff": null,
@@ -10112,6 +10185,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-087",
             "with_diff": null,
@@ -10122,6 +10196,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-089",
             "with_diff": null,
@@ -10132,6 +10207,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-090",
             "with_diff": null,
@@ -10142,6 +10218,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "FIXED",
             "finding": "2026-10-04-documentation-review-01-091",
             "with_diff": null,
@@ -10152,6 +10229,7 @@
             "agreeing_code": null
         },
         {
+            "quote": "",
             "blind": "NOT_FIXED",
             "finding": "2026-10-04-documentation-review-01-092",
             "with_diff": null,
@@ -10165,6 +10243,8 @@
     "base": "",
     "instrument": "documentation_review",
     "tokens": null,
+    "credited": [
+    ],
     "silent": [
     ],
     "agent_launches": 40

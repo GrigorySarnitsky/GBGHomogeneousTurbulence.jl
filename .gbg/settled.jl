@@ -36,4 +36,17 @@
                 Location(file = "docs/src/index.md", node = "GBGHomogeneousTurbulence.jl / Components", text = "[`Propagator`](api/Propagator/): the interchangeable integrating-factor schemes under `AbstractIntegrator`.", line = 134),
                 Location(file = "docs/src/index.md", node = "GBGHomogeneousTurbulence.jl / Components", text = "[`Forcing`](api/Forcing/): the interchangeable energy-injection strategies under `AbstractForcing`, chosen independently for the velocity and the scalar.", line = 126),
             ]),
+    Settled(question = "2026-10-04-documentation-review-01-010-code",
+            text = "Already fixed by 07f0cd34 on the owner's ruling of 2026-10-09: the seeders' required inputs are positional; the timestep, the scalar flag and the helpers' inputs stay keywords under the keyword-default rule (owner, 2026-10-19).",
+            date = "2026-10-19",
+            locations = [
+                Location(file = "src/State.jl", node = "random_solenoidal_velocity_spectral!", text = "random_solenoidal_velocity_spectral!(û, domain; kinetic_energy, envelope_wavenumber,", line = 148),
+                Location(file = "src/State.jl", node = "random_scalar_spectral!", text = "random_scalar_spectral!(φ̂, domain; scalar_variance, envelope_wavenumber,", line = 250),
+                Location(file = "src/SimulationRun.jl", node = "advance!", text = "    advance!(sim; dt = nothing)", line = 1038),
+                Location(file = "src/SimulationRun.jl", node = "run!", text = "    run!(callback, sim; dt = nothing)", line = 1269),
+                Location(file = "src/SimulationRun.jl", node = "predicted_stationary_state", text = "predicted_stationary_state(domain; velocity_forcing = ConstantPower(),", line = 434),
+                Location(file = "src/Forcing.jl", node = "kinetic_energy_in_box_units", text = "kinetic_energy_in_box_units(forcing; reynolds_box = nothing, reynolds_taylor = nothing)", line = 940),
+                Location(file = "src/Propagator.jl", node = "allocate_buffers", text = "allocate_buffers(scheme, domain; scalar = false) -> IntegratorBuffers", line = 153),
+                Location(file = "src/Forcing.jl", node = "kinetic_energy_in_box_units", text = "kinetic_energy_in_box_units(forcing; reynolds_box = nothing, reynolds_taylor = nothing)", line = 970),
+            ]),
 ]
