@@ -50,8 +50,9 @@ the same commit as its count would pass.
 
 ## What is asked
 
-1. **Require the ideal.** Remove `Traffic(role, array, frozen)`, so that every row states
-   `Traffic(role, array, frozen, ideal)`, or adds a holder when the two differ. A row at its ideal
+1. **Require the ideal.** Replace `Traffic(role, array, frozen)` with a four-argument
+   `Traffic(role, array, frozen, ideal)` that refuses `frozen != ideal`, so that every row states its
+   ideal, and adds a holder in the five-argument form when the two differ. A row at its ideal
    then writes the pair twice, and writing it is the claim. Make `ideal_reads` and `ideal_writes`
    required in `traffic_rows` in the same way.
 2. **State the rule beside the check.** For example, in `testing-protocol.md`: *a traffic row's ideal
