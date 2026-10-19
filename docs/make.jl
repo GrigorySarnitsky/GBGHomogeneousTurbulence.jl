@@ -79,6 +79,9 @@ GBGCodingTools.makedocs(ROOT;
   pages = [
     "Home"              => "index.md",
     "Notation"          => "notation.md",
+    "Examples" => Any[
+      "Two-peak scalar mixing" => "examples/two_peak_scalar_mixing.md",
+    ],
     "API"  => Any[
       "Overview"               => "api.md",
       "GBGHomogeneousTurbulence" => "api/GBGHomogeneousTurbulence.md",
