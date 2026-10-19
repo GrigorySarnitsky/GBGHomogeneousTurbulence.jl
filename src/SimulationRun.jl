@@ -317,6 +317,17 @@ so, holds ``\\varepsilon``. The viscosity is derived from the grid, or supplied:
     ``2/3`` rule. The chosen ``\\nu``, ``k``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda`` are logged, with what
     the forcing guarantees.
 
+    What is guaranteed follows what the forcing holds. A forcing holding ``\\varepsilon``, as the
+    default does, meets `κ_max_η` in the stationary mean whatever ``\\tilde{k}`` truly is, and leaves
+    ``k`` the prediction. One holding ``k`` makes ``\\varepsilon``, and with it the resolution, the
+    prediction. One holding neither, given its own strength — a [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) rate, a [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU)
+    variance, a `VarianceRescaling(over = :band)` target — draws a warning, since ``\\nu`` then
+    describes a stationary state the run may not reach.
+
+    A forcing the prediction does not cover has no stationary state to derive ``\\nu`` from, and is
+    refused with an `ArgumentError`: an unforced run (`velocity_forcing = NoForcing()`), a forcing
+    that forces no band of shells, and a band that does not start at shell 1 or ends at shell 1.
+
     !!! note "The criterion measures the resolved band, strategy by strategy"
         ``\\kappa_{\\max}`` here is each strategy's resolved cutoff — for
         [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) that is
@@ -328,17 +339,6 @@ so, holds ``\\varepsilon``. The viscosity is derived from the grid, or supplied:
         ``\\nu \\propto f^{-4/3}``, `HouLi` gives ``\\mathrm{Re}_\\lambda`` about 13% and
         [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) about 26% above the
         ``2/3`` rule.
-
-    What is guaranteed follows what the forcing holds. A forcing holding ``\\varepsilon``, as the
-    default does, meets `κ_max_η` in the stationary mean whatever ``\\tilde{k}`` truly is, and leaves
-    ``k`` the prediction. One holding ``k`` makes ``\\varepsilon``, and with it the resolution, the
-    prediction. One holding neither, given its own strength — a [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) rate, a [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU)
-    variance, a `VarianceRescaling(over = :band)` target — draws a warning, since ``\\nu`` then
-    describes a stationary state the run may not reach.
-
-    A forcing the prediction does not cover has no stationary state to derive ``\\nu`` from, and is
-    refused with an `ArgumentError`: an unforced run (`velocity_forcing = NoForcing()`), a forcing
-    that forces no band of shells, and a band that does not start at shell 1 or ends at shell 1.
 
   * When `viscosity` is supplied, it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError`. A covered forcing's stationary state is still predicted, at the
