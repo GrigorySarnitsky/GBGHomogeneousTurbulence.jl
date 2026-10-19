@@ -1,7 +1,8 @@
 # To GBGCodingTools: a traffic row's ideal defaults to its measured count, so the row cannot fail
 
 Status: approved by the owner on 2026-10-19, sent to the GBGCodingTools session the same day for
-consideration.
+consideration; delivered in GBGCodingTools rc.84 (2026-10-19) in the strict form, and HT moved to it on
+2026-10-20.
 
 ## What happens
 

@@ -82,10 +82,11 @@ const ACCUMULATE_READ = "the accumulating `convolve!(field, field, band, α, 1)`
                         "its source, one array, in one pass. A non-accumulating kernel of symbol 1 + (s − 1)χ " *
                         "loads once and ran 11% faster in Float32, no faster in Float64; it would state the " *
                         "band edges a second time, beside `spectral_band`"
-# A row's ideal is what the operation needs, stated from that. `Traffic(role, array, frozen)` sets the
-# ideal to the frozen pair, so that form is kept for rows whose frozen count is itself derived as the
-# ideal — the zero rows and the gathers' stencil count. Any other row written that way could not fail
-# however much it swept; until 2026-10-19 the band forcings and the truncation were.
+# A row's ideal is what the operation needs, stated from that, never copied from the count (GBGCodingTools
+# rc.84, on HT's request of 2026-10-19). The zero rows and the gathers state the pair twice: their frozen
+# count is itself derived as the ideal, zero traffic and the stencil count. Before rc.84 the three-part
+# form set the ideal to the frozen pair, and until 2026-10-19 the band forcings and the truncation
+# were written that way, so they could not fail however much they swept.
 const BAND_SWEEP = "the band kernel is a lazy symbol PF applies over every stored mode, so the band " *
                    "reduction and the band `convolve!` read the whole field and the convolve writes it, " *
                    "where the forcing needs only the band's B entries; a band-only gather and scatter, as " *
@@ -141,7 +142,7 @@ end
     audit(() -> add_forcing_source!(OU, OU_PROCESS, N̂, OU_Û, DOMAIN, 0.05),
           "add_forcing_source!(StochasticOU)",
           Traffic("dest", field_data(N̂), (COMPANION, COMPANION), (B, B), WHOLE_COMPANION),
-          Traffic("source", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
+          Traffic("source", field_data(OU_Û), (0, 0), (0, 0)); print = PRINT_COUNTS)
     # The ideals: `:total` reads every entry once for the whole field's variance, then rescales the
     # band in place; `:band` needs the band alone, read for its variance and again to rescale it.
     audit(() -> project_forcing!(TOTAL, Û, DOMAIN), "project_forcing!(VarianceRescaling :total)",
@@ -152,25 +153,25 @@ end
                   ACCUMULATE_READ * "; " * BAND_SWEEP * "; and " * WHOLE_FIELD_GUARD);
           print = PRINT_COUNTS)
     audit(() -> prepare_forcing!(OU, OU_PROCESS, OU_Û, DOMAIN, 1e-3), "prepare_forcing!(StochasticOU)",
-          Traffic("field", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
+          Traffic("field", field_data(OU_Û), (0, 0), (0, 0)); print = PRINT_COUNTS)
   end
 
   @testset "the generator's opening and closing, and the band truncation" begin
     audit(() -> prepare!(OU_RUN.generator, OU_STATE, DOMAIN, 1e-3), "prepare!",
-          Traffic("state", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
+          Traffic("state", field_data(OU_Û), (0, 0), (0, 0)); print = PRINT_COUNTS)
     audit(() -> finalize!(OU_RUN.generator, OU_STATE, DOMAIN), "finalize!",
-          Traffic("state", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
+          Traffic("state", field_data(OU_Û), (0, 0), (0, 0)); print = PRINT_COUNTS)
     audit(() -> truncate_to_band!(Û, DOMAIN), "truncate_to_band!",
           Traffic("field", field_data(Û), (P, P), (0, P - KEPT), SHARP_MASK_MULTIPLY); print = PRINT_COUNTS)
   end
 
   @testset "the tracer gathers: the stencil entries each point needs, once" begin
     audit(() -> interpolate_at_particles!(SAMPLES, U, RUN.tracers), "interpolate_at_particles!",
-          Traffic("field", field_data(U), (GATHER, 0)); print = PRINT_COUNTS)
+          Traffic("field", field_data(U), (GATHER, 0), (GATHER, 0)); print = PRINT_COUNTS)
     audit(() -> advect!(RUN.particle_integration_scheme, RUN.tracers, U, DOMAIN, RUN.particle_buffers, 1e-3),
-          "advect!(Heun)", Traffic("velocity_end", field_data(U), (GATHER, 0)); print = PRINT_COUNTS)
+          "advect!(Heun)", Traffic("velocity_end", field_data(U), (GATHER, 0), (GATHER, 0)); print = PRINT_COUNTS)
     audit(() -> deposit!(RUN.cache, RUN.tracers, U), "deposit!(the tracer sample)",
-          Traffic("field", field_data(U), (GATHER, 0)); print = PRINT_COUNTS)
+          Traffic("field", field_data(U), (GATHER, 0), (GATHER, 0)); print = PRINT_COUNTS)
   end
 end
 
