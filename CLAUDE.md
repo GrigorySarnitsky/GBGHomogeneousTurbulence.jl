@@ -221,8 +221,8 @@ and tensors are bold italic ``\boldsymbol{u}``; the wavenumber set is kept disti
 ``\boldsymbol{\kappa}`` the vector, ``\kappa`` its magnitude, ``k`` the turbulent kinetic energy,
 ``\varkappa`` the scalar diffusivity; the passive scalar is ``\varphi``, never ``\theta``; the Leray
 projection is ``\mathbb P``, a Mori–Zwanzig projection ``\mathcal P``; a conditional bar is ``\mid``.
-The Reynolds number is set through ``\nu`` (``\mathrm{Re} = 1/\nu``), never a field —
-``\mathrm{Re}_\lambda`` is measured. Long docstring signatures hand-wrap with a hanging indent under the
+The Reynolds number is set through ``\nu``, never as an argument; ``\mathrm{Re}_\lambda`` and
+``\mathrm{Re}_{\mathrm{box}}`` are measured. Long docstring signatures hand-wrap with a hanging indent under the
 first argument.
 
 **Bind each code object to its symbol on first mention** — write the correspondence explicitly so it is

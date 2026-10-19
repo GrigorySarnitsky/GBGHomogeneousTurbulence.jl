@@ -49,7 +49,7 @@ The Code column gives the name each symbol carries in the package.
 | ``\nu`` | kinematic viscosity (sets the Reynolds number) | `viscosity`, a field of [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) |
 | ``\mathrm{Sc}`` | Schmidt number | `schmidt`, likewise |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
-| ``\mathrm{Re}`` | Reynolds number, set through the viscosity on the box's order-one reference scales (the default initial condition seeds the rms velocity ``u' = 1``, and the large scales are of order the box side — the ``U`` and ``L`` of ``UL/\nu`` are units, not inputs; the measured value is the Taylor-microscale ``\mathrm{Re}_\lambda``) | `1 / ν` (``\mathrm{Re} = u'L/\nu``, with the box side ``L`` the unit of length; on the shipped defaults ``u' = 1``, ``L = 2\pi``, the box-scale value is ``2\pi/\nu``) |
+| ``\mathrm{Re}`` | a Reynolds number, a velocity times a length over ``\nu``. A run takes none as an input: it is set through ``\nu``, and measured as ``\mathrm{Re}_{\mathrm{box}}`` or ``\mathrm{Re}_\lambda`` below | — |
 
 *(The scalar diffusivity ``\varkappa`` is a deliberately distinct glyph from the wavenumber
 magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*

@@ -26,12 +26,6 @@ and the exact viscous integrating factor — in these parts:
   viscous/diffusive integrating factor, with any linear forcing rate folded in.
 - [`finalize!`](@ref) — apply the post-step forcing projections; the *iteration* closes later, when
   [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) writes the step's observables into the observables cache.
-
-The assemblies recover displaced fields (on the half-cell-shifted grid) in physical representation with the four-argument,
-source-preserving form of
-[`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!) — the extra
-argument is a scratch field the transform consumes in the source's place — and with
-[`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!).
 """
 module Generator
 
@@ -50,19 +44,14 @@ export FlowConditions, ResolvedGenerator,
 """
     FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)
 
-The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`;
-``\\mathrm{Re} = u'L/\\nu``: with the velocity scale ``u' = 1`` and the shipped box side ``L = 2\\pi`` the box-scale value is
-``2\\pi/\\nu``, and ``1/\\nu`` with the box side as the unit of length; the Reynolds number
-built on the integral scale is smaller still), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
-scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
+The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`),
+the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the scalar diffusivity is
+``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
 (`velocity_forcing`, `scalar_forcing`, both
 [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing)).
 
 These are what a run is configured with; what the flow turns out to have is measured by
 [`Observables`](@ref GBGHomogeneousTurbulence.Observables).
-
-A scheme reads the conditions through the [`ResolvedGenerator`](@ref) it is handed;
-[`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) never holds them itself.
 
 # Arguments
 All keyword, all required:
@@ -435,8 +424,9 @@ written, not one: `N̂` receives the result, and `ω_consumed` is consumed in pl
 # Arguments
 - `N̂` — the field in spectral representation receiving the assembled term.
 - `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
-- `û` — the stage velocity in spectral representation, consulted by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)'s evaluation
-  on the half-cell-shifted grid; a mask strategy ([`TwoThirds`](@ref), [`HouLi`](@ref)) leaves it unused.
+- `û` — the stage velocity in spectral representation, only read: [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)'s
+  evaluation on the half-cell-shifted grid consults it, and a mask strategy ([`TwoThirds`](@ref),
+  [`HouLi`](@ref)) leaves it unused.
 - `u` — the stage velocity in physical representation, only read.
 - `ω_consumed` — the stage vorticity in physical representation, consumed (see the note below).
 - `domain` — the [`FixedDomain`](@ref) whose dealiasing strategy and transforms assemble the term.
@@ -603,8 +593,8 @@ the result, and `u_consumed` is consumed in place — the `_consumed` suffix mar
 # Arguments
 - `N̂` — the field in spectral representation receiving the assembled term.
 - `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
-- `û`, `φ̂` — the stage velocity and scalar in spectral representation, consulted by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift);
-  a mask strategy leaves both unused.
+- `û`, `φ̂` — the stage velocity and scalar in spectral representation, only read: [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)
+  consults them, and a mask strategy leaves both unused.
 - `u_consumed` — the stage velocity in physical representation, consumed (see the note below).
 - `φ` — the stage scalar in physical representation, only read.
 - `domain` — the [`FixedDomain`](@ref) whose dealiasing strategy and transforms assemble the term.

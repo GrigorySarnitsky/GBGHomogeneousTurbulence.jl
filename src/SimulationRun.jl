@@ -372,8 +372,10 @@ The run group, `kwargs...` in both signatures
   ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin. It defaults to `nothing`
   and the derivation then uses `2`; the sentinel is what lets the constructor tell an omitted keyword from
   an explicit one, so that giving both it and `viscosity` is an error rather than a silent drop.
-- `viscosity` — the kinematic viscosity ``\\nu``, which is how the Reynolds number is set (it is
-  ``1/\\nu`` only in units where ``u' = L = 1``; measure ``\\mathrm{Re}_\\lambda`` for the run's actual value); omit to derive ``\\nu`` from the grid.
+- `viscosity` — the kinematic viscosity ``\\nu``; omit it to derive ``\\nu`` from the grid. The run
+  takes no Reynolds number: its Reynolds numbers follow from ``\\nu`` and the flow, and
+  [`reynolds_box`](@ref GBGHomogeneousTurbulence.Observables.reynolds_box) and
+  [`reynolds_taylor`](@ref GBGHomogeneousTurbulence.Observables.reynolds_taylor) compute them.
 - `kinetic_energy = nothing`, `dissipation = nothing` — the run's stationary state, as its kinetic
   energy ``k`` or its dissipation rate ``\\varepsilon``. Give at most one, or neither and let the
   velocity forcing's target state it; with no source at all ``k = 1.5``, an r.m.s. velocity

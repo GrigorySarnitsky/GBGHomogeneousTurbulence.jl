@@ -265,8 +265,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
 ### 4.2 `Generator` — the evolution, split reversible and irreversible
 
 `Generator` realizes the Mori–Zwanzig generator: the right-hand side the propagator advances. Its physical
-inputs are bundled in `FlowConditions` — the viscosity ``\nu`` (``\mathrm{Re} = u'L/\nu``:
-``2\pi/\nu`` on the shipped defaults, velocity scale ``u' = 1`` and box side ``L = 2\pi``, and ``1/\nu`` with the box side as the unit of length), the Schmidt number
+inputs are bundled in `FlowConditions` — the viscosity ``\nu``, the Schmidt number
 ``\mathrm{Sc}`` (scalar diffusivity ``\varkappa = \nu/\mathrm{Sc}``), and the two forcings; ``\nu`` and
 ``\mathrm{Sc}`` set the diffusion, the forcings the source, and folding this bundle into `Generator` is what
 adds the `Generator → Forcing` dependency. It carries a
