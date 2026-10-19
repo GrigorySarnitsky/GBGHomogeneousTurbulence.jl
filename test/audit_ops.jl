@@ -131,21 +131,36 @@ const VALUE_CLASS = Dict(
   :φstar_spec => :spectral_scalar, :sshift => :spectral_scalar, :scopy => :spectral_scalar,
   :chart_φ => :physical_scalar, :pshift => :physical_scalar,
 )
-# Values whose live range is extended past their last use in the op list — live because the DYNAMICS
-# of the iteration says so: the state is read and written by every stage and must persist between
-# steps, and the cache slots hold the deposited observables the NEXT iteration's first stage reads, so
-# their closing deposits must survive the list's end just as their previous deposits precede its start.
-# Extending each is a statement of fact, so the set belongs in a lower bound.
+# Values live at the ENDS of the op list — because the DYNAMICS of the iteration says so: the state
+# persists between steps, and the cache slots hold the deposited observables the NEXT iteration's first
+# stage reads, so their closing deposits survive the list's end just as their previous deposits
+# precede its start. That is all the set states. Between its ends a value of this set is live only
+# where the op list needs it, like any other: the charts are stage registers there (decision 40), and
+# a chart spent by the first stage's cross product holds nothing until the next recovery refills it.
 #
 # (History: decision 37 split a CHART_CONTRACT_LIVE choice out of this set — the charts then survived
 # the step UNTOUCHED beside separate substage registers, an assumption that had turned the bound into
-# a tautology. The slot=register merge (decision 40) dissolved the choice: one register per chart now
-# serves both roles, so the extension no longer stacks registers on top of the stage need.)
+# a tautology. The slot=register merge (decision 40) dissolved the choice, but the extension stayed
+# applied across the WHOLE list, the same assumption in a smaller form: the bound then counted a spent
+# chart beside PhaseShift's displaced registers, and every scratch register from its first use to its
+# last through the spans it held nothing, so it rose to what the code stores and hid the gaps the
+# register now claims (2026-10-19).)
 const DYNAMICS_LIVE = Set([:û, :φ̂, :chart_u, :chart_ω, :chart_φ])
 
 # The traffic model asks the same question of the same set: a value written and still needed after a
 # segment must reach memory.
 const CONTRACT_LIVE = DYNAMICS_LIVE
+
+# Whether the value `v` holds after op `j` is still needed: its next access is a read, or there is
+# none and the value lives past the list's end. A value overwritten before it is read is dead, however
+# often the array is read again later.
+function _needed_after(ops, v, j)
+  for k in (j + 1):length(ops)
+    v in ops[k].reads && return true
+    v in ops[k].writes && return false
+  end
+  return v in DYNAMICS_LIVE
+end
 
 
 # The closing deposit (deposit! in src/Propagator.jl): the iteration closes by recovering its
@@ -431,35 +446,35 @@ function rk2_ops(scalar::Bool; phase_shift::Bool = false, closing::Bool = true)
 end
 
 
-# Peak simultaneous liveness per shape class: a value is live from its first write (or from the
-# start, if extended or read before written) to its last read (or the end, if extended). Only
-# DYNAMICS_LIVE values are extended — every extension is a fact of the iteration contract (decision
-# 37's charts_live choice dissolved with the slot=register merge, decision 40) — so the result is a
-# genuine lower bound on the registers this operation order needs.
+# Peak simultaneous liveness per shape class, by value rather than by array: walking the list
+# backwards, a value is live from the op that writes it to the last op that reads it before it is
+# overwritten, and a DYNAMICS_LIVE value also at the list's ends. An op occupies a register for each
+# value it reads or writes, beside every value live across it. An array that holds nothing needed
+# between two of its uses is free there, so the result is the lower bound on the registers this
+# operation order needs, not a count of the arrays the code allocates. Whether a register assignment
+# reaching it exists under the operations' in-place forms is a separate question, which the gap
+# register's holders state.
 function peak_liveness(ops)
-  extended = DYNAMICS_LIVE
-  first_use = Dict{Symbol, Int}()
-  last_use = Dict{Symbol, Int}()
-  for (i, op) in enumerate(ops), v in Iterators.flatten((op.reads, op.writes))
-    haskey(first_use, v) || (first_use[v] = i)
-    last_use[v] = i
+  used = Set{Symbol}()
+  for op in ops
+    union!(used, op.reads, op.writes)
   end
-  for v in keys(first_use)
-    if v in extended
-      first_use[v] = 0
-      last_use[v] = length(ops) + 1
-    end
-  end
+  live = intersect(DYNAMICS_LIVE, used)               # live past the list's end
   peaks = Dict(class => 0 for class in CLASSES)
-  for i in 1:length(ops)
-    live = Dict(class => 0 for class in CLASSES)
-    for v in keys(first_use)
-      first_use[v] <= i <= last_use[v] && (live[VALUE_CLASS[v]] += 1)
+  for op in Iterators.reverse(ops)
+    occupied = Dict(class => 0 for class in CLASSES)
+    for v in union(live, op.reads, op.writes)
+      occupied[VALUE_CLASS[v]] += 1
     end
     for class in CLASSES
-      peaks[class] = max(peaks[class], live[class])
+      peaks[class] = max(peaks[class], occupied[class])
     end
+    live = union(setdiff(live, op.writes), op.reads)
   end
+  # Live before the first op means read before written: only a value carried in from the previous
+  # iteration may be. Anything else is an op list reading an array nothing has filled.
+  issubset(live, DYNAMICS_LIVE) ||
+    error("op list reads $(collect(setdiff(live, DYNAMICS_LIVE))) before any op writes it")
   return NamedTuple{CLASSES}(Tuple(peaks[class] for class in CLASSES))
 end
 
@@ -617,16 +632,56 @@ const TRAVERSAL_ORDER_CHECK = Holder(
   "million tracers; the temporary ledger's tracer-count rows and their device column",
   "the order is built only through PF's public constructor and rebuild, with no request to PF for " *
   "a one-off byte per tracer (a named property)")
-const ALL_HOLDERS = (UNUSED_FUSION, DEVICE_PLAN_BUFFERS,
+# The liveness gaps the value-level bound opened (2026-10-19), when the bound stopped counting an array
+# as live through the spans it holds nothing. Both are open for study, not accepted: each claims
+# registers the operation order does not need, and taking either changes what an operation may
+# overwrite, so each is the owner's to decide.
+const DISPLACED_BESIDE_SPENT_CHARTS = Holder(
+  "DISPLACED EVALUATION BESIDE SPENT CHARTS", :FIX,
+  "PhaseShift keeps its displaced-grid u and ω, and φ with a scalar, in resident arrays of their own, " *
+  "while the cache's u, ω and φ arrays hold nothing needed during the displaced evaluation: the " *
+  "primary cross product has spent ω, a velocity-only run no longer needs u, and the primary flux has " *
+  "spent φ. Up to two physical vectors, 768 MiB at 256³ / Float64. Taking it means the displaced " *
+  "recoveries write over the stage's physical velocity, which velocity_rhs! now only reads.")
+const IFHEUN_STAGE_REGISTERS = Holder(
+  "IFHEUN STAGE REGISTERS", :FIX,
+  "IFHeun's operation order needs one spectral vector fewer than it allocates, about 384 MiB at " *
+  "256³ / Float64. Under a mask dealiasing the predictor state is needed only until the stage-2 " *
+  "fields are recovered from it, and the generator's spectral product register is idle over exactly " *
+  "that span; under PhaseShift no two arrays are disjoint, and the saving needs a reassignment across " *
+  "several. With PhaseShift and a scalar one spectral scalar is spare as well, the predictor scalar " *
+  "against the displaced-scalar copy register. Which arrays merge, under the operations' in-place " *
+  "forms, is the study.")
+const ALL_HOLDERS = (UNUSED_FUSION, DEVICE_PLAN_BUFFERS, DISPLACED_BESIDE_SPENT_CHARTS, IFHEUN_STAGE_REGISTERS,
                      TRANSFORM_PLANNING, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
                      UNIFORM_DEPOSIT_SCHEDULE, TRAVERSAL_ORDER_CHECK)
 
 # A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
 # cannot be added silently, and taking the win means deleting the entry in the same commit.
-# (Empty: the temporary ledger's local wins of 2026-10-01 were taken, or kept by decision 108, and
-# the tracer seeding copies found on 2026-10-03 were taken the same day.)
-const OPEN_LOCAL_WINS = ()
+# (The temporary ledger's local wins of 2026-10-01 were taken, or kept by decision 108, and the tracer
+# seeding copies found on 2026-10-03 were taken the same day. The two below are open for study, the
+# owner's word of 2026-10-19.)
+const OPEN_LOCAL_WINS = ("DISPLACED EVALUATION BESIDE SPENT CHARTS", "IFHEUN STAGE REGISTERS")
+
+# Named holders for the fusion gaps, by shape class (the causes are configuration-independent).
+# The physical-side and configuration classes sit AT their bounds in every cell — the cross
+# products, fluxes, copies, and per-segment kernel reads are already ideal. Every gap lives in the
+# two spectral classes, and every one is a PF-kernel-granularity artifact of the numpy model: the
+# passes above the fused ideal are re-reads and re-writes between the op-per-kernel boundaries,
+# including the write of a value the next op of the same segment consumes and nothing reads again:
+#   spectral_vector / spectral_scalar — UNFUSED STAGE PIPELINE: projection⊙dealias → accumulate →
+#     fused-exponential update still run as one kernel per op where one fused per-mode kernel could
+#     read (product, state) and write (state, accumulator) once. FACTOR MATERIALIZATION is RETIRED
+#     (decision 39): the fused exponential computes the factor in register, exactly what the holder
+#     asked of the backend — the pre-registered round-3 candidate (the two-output stage kernel) is
+#     what remains of this class.
+# Claimed by the register's holder above, and named by the compute audit's fusion test and the
+# optimality audit's pass floor alike, so the gap is one entry on the list, not two.
+const FUSION_GAP_HOLDERS = Dict(
+  :spectral_vector => UNUSED_FUSION,
+  :spectral_scalar => UNUSED_FUSION,
+)
 
 
 # The task state a THREADED run pays per transform execution — FFTW's worker callback, and the
@@ -735,7 +790,9 @@ function _passes(ops)
 end
 
 # The fused ideal per between-barriers segment: live-in values read once, live-out values written
-# once, each distinct configuration array read once; pure intermediates cost nothing. A reduction
+# once, each distinct configuration array read once; pure intermediates cost nothing. A live-out value
+# is one the rest of the list reads before overwriting it, or one carried past the list's end; a value
+# the segment leaves and the list overwrites unread is an intermediate too. A reduction
 # contributes its (irreducible) read passes and breaks the segment.
 # `materialize_symbols = false` gives the PHYSICAL FLOOR rather than the fused ideal: it drops the
 # field-scale configuration reads (the dealias mask, the translation kernels, the |κ|² the factor
@@ -780,9 +837,7 @@ function _fusion_bound(ops; materialize_symbols::Bool = true)
       acc[VALUE_CLASS[v]] += 1
     end
     for v in written
-      if v in CONTRACT_LIVE || any(k -> v in ops[k].reads, (j + 1):n)
-        acc[VALUE_CLASS[v]] += 1
-      end
+      _needed_after(ops, v, j) && (acc[VALUE_CLASS[v]] += 1)   # a value overwritten unread never reaches memory
     end
     for extra in values(extras), class in CLASSES
       acc[class] += getproperty(extra, class)

@@ -68,6 +68,8 @@ const P = length(field_data(Û))
 const GATHER = 8 * 4^3 * 3                       # M tracers × the 4³ CatmullRom stencil × 3 components
 # The stored entries of the default forcing band, shells 1–2: the modes the stochastic source changes.
 const B = 3 * count(!iszero, field_data(materialize_kernel(spectral_band(DOMAIN.multipliers, 0.5, 2.5)).field))
+# The entries the default dealias mask keeps, sharp at 2/3: the rest are the ones truncation zeroes.
+const KEPT = 3 * count(!iszero, field_data(materialize_kernel(DOMAIN.dealias).field))
 # The modes it actually touches: every mode of its companion grid below that grid's Nyquist frequency,
 # n/2 × (n − 1)² per component, the companion being the smallest even grid above the band, n = 2(2 + 1).
 const COMPANION = let n = 2 * (2 + 1); 3 * (n ÷ 2) * (n - 1)^2 end
@@ -80,6 +82,20 @@ const ACCUMULATE_READ = "the accumulating `convolve!(field, field, band, α, 1)`
                         "its source, one array, in one pass. A non-accumulating kernel of symbol 1 + (s − 1)χ " *
                         "loads once and ran 11% faster in Float32, no faster in Float64; it would state the " *
                         "band edges a second time, beside `spectral_band`"
+# A row's ideal is what the operation needs, stated from that. `Traffic(role, array, frozen)` sets the
+# ideal to the frozen pair, so that form is kept for rows whose frozen count is itself derived as the
+# ideal — the zero rows and the gathers' stencil count. Any other row written that way could not fail
+# however much it swept; until 2026-10-19 the band forcings and the truncation were.
+const BAND_SWEEP = "the band kernel is a lazy symbol PF applies over every stored mode, so the band " *
+                   "reduction and the band `convolve!` read the whole field and the convolve writes it, " *
+                   "where the forcing needs only the band's B entries; a band-only gather and scatter, as " *
+                   "PF's `embed_modes!` gives the stochastic forcing, would touch B. Shells 1–2 are about " *
+                   "10⁻⁵ of a 256³ field"
+const WHOLE_FIELD_GUARD = "the empty-band guard compares the band against the whole field, read in the same " *
+                          "fused reduction, which a band-only forcing does not otherwise need"
+const SHARP_MASK_MULTIPLY = "a sharp mask is applied as a coefficientwise multiply over every mode: the kept " *
+                            "modes are read and rewritten unchanged, and the removed ones read before being " *
+                            "zeroed. Zeroing the removed modes alone reads nothing"
 const WHOLE_COMPANION = "the source is PF's `embed_modes!`, which copies every mode of the companion grid " *
                         "below its Nyquist frequency, zeros outside the band included. The companion is the " *
                         "smallest grid holding the band, so the excess is a few hundred modes, independent " *
@@ -110,23 +126,30 @@ end
 
 @testset "traffic audit: every measurable in-place operation, element by element" begin
   @testset "forcing calls" begin
+    # The ideals: the band observable needs the band's entries, read again after the reduction's
+    # barrier to add the source into the band of the destination. The controller also holds the whole
+    # field's variance and dissipation, so its reduction reads every entry once.
     audit(() -> add_forcing_source!(VELOCITY_FORCING, nothing, N̂, Û, DOMAIN, 0.05),
           "add_forcing_source!(ConstantPower)",
-          Traffic("dest", field_data(N̂), (P, P)),
-          Traffic("source", field_data(Û), (2P, 0)); print = PRINT_COUNTS)
+          Traffic("dest", field_data(N̂), (P, P), (B, B), BAND_SWEEP),
+          Traffic("source", field_data(Û), (2P, 0), (2B, 0), BAND_SWEEP * "; and " * WHOLE_FIELD_GUARD);
+          print = PRINT_COUNTS)
     audit(() -> add_forcing_source!(CONTROLLER, nothing, N̂, Û, DOMAIN, 0.05),
           "add_forcing_source!(VarianceController)",
-          Traffic("dest", field_data(N̂), (P, P)),
-          Traffic("source", field_data(Û), (2P, 0)); print = PRINT_COUNTS)
+          Traffic("dest", field_data(N̂), (P, P), (B, B), BAND_SWEEP),
+          Traffic("source", field_data(Û), (2P, 0), (P + B, 0), BAND_SWEEP); print = PRINT_COUNTS)
     audit(() -> add_forcing_source!(OU, OU_PROCESS, N̂, OU_Û, DOMAIN, 0.05),
           "add_forcing_source!(StochasticOU)",
           Traffic("dest", field_data(N̂), (COMPANION, COMPANION), (B, B), WHOLE_COMPANION),
           Traffic("source", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
+    # The ideals: `:total` reads every entry once for the whole field's variance, then rescales the
+    # band in place; `:band` needs the band alone, read for its variance and again to rescale it.
     audit(() -> project_forcing!(TOTAL, Û, DOMAIN), "project_forcing!(VarianceRescaling :total)",
-          Traffic("field", field_data(Û), (3P, P), (2P, P), ACCUMULATE_READ);
+          Traffic("field", field_data(Û), (3P, P), (P + B, B), ACCUMULATE_READ * "; and " * BAND_SWEEP);
           print = PRINT_COUNTS)
     audit(() -> project_forcing!(BAND, Û, DOMAIN), "project_forcing!(VarianceRescaling :band)",
-          Traffic("field", field_data(Û), (3P, P), (2P, P), ACCUMULATE_READ);
+          Traffic("field", field_data(Û), (3P, P), (2B, B),
+                  ACCUMULATE_READ * "; " * BAND_SWEEP * "; and " * WHOLE_FIELD_GUARD);
           print = PRINT_COUNTS)
     audit(() -> prepare_forcing!(OU, OU_PROCESS, OU_Û, DOMAIN, 1e-3), "prepare_forcing!(StochasticOU)",
           Traffic("field", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
@@ -138,7 +161,7 @@ end
     audit(() -> finalize!(OU_RUN.generator, OU_STATE, DOMAIN), "finalize!",
           Traffic("state", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
     audit(() -> truncate_to_band!(Û, DOMAIN), "truncate_to_band!",
-          Traffic("field", field_data(Û), (P, P)); print = PRINT_COUNTS)
+          Traffic("field", field_data(Û), (P, P), (0, P - KEPT), SHARP_MASK_MULTIPLY); print = PRINT_COUNTS)
   end
 
   @testset "the tracer gathers: the stencil entries each point needs, once" begin

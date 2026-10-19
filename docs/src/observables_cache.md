@@ -221,7 +221,7 @@ a real decision: a vector field on a grid of ``N`` points per axis is ``3N^{3}``
 precision and 192 MiB in single, so a callback materializing a field-sized diagnostic is buying a
 third of a gigabyte; a number costs nothing worth counting.
 
-For scale: a velocity-only run under
+For scale: a velocity-only run of a three-stage scheme under
 [`TwoThirds`](@ref GBGHomogeneousTurbulence.SimulationDomain.TwoThirds) or
 [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) carries six vector-shaped fields — four
 in spectral representation and two in physical — about 2.3 GiB at ``256^{3}`` in double precision,

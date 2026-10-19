@@ -3426,6 +3426,30 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     docstrings keep the literature's terms, the integral scale and the Taylor microscale, in their
     identity sentences; the formulas are unchanged.
 
+116. **(2026-10-19, user-directed) Every audit bound is computed from what the work needs, never from
+    what the code does.** Asked whether `PhaseShift` stores the shifted and unshifted velocity at once,
+    the session found that the liveness bound still held the cache's charts live across the whole
+    step: decision 37's assumption, in the smaller form decision 40 left. The owner asked for the
+    audit fixed, no code changed, and every bound of the class found. Five were:
+
+    - Liveness counted an array live from its first use to its last; it now counts values.
+    - The fused-traffic bound counted a value overwritten unread as reaching memory.
+    - The transform bound was a copy of the measured ledger.
+    - The pass floor's claim test passed whenever the fusion holder existed.
+    - The traffic audit's band forcings and `truncate_to_band!` took the measured count as ideal.
+
+    The corrected liveness bound opened two gaps, claimed as open local wins for study:
+    `PhaseShift`'s displaced registers beside spent charts (up to two physical vectors, 768 MiB at
+    ``256^{3}`` in double precision), and one spare spectral vector in `IFHeun`'s order. The fused
+    bound's extra traffic is intermediate, claimed by `UNFUSED STAGE PIPELINE`. The derived transform
+    bound equals the ledger, so nothing was hidden there. The traffic ideals are now the band's
+    entries, or the modes truncation zeroes, and the whole-field sweeps are claimed by name.
+
+    The synchronization floors are left as they are and put to the owner. They take the run's cadence
+    as given: the turnover clock and the stationarity detector each cost one crossing per iteration
+    because each decides on the host every iteration, and a decision taken less often would cost
+    less.
+
 ## References
 
 Works are cited author–year above and given in full here, each with its DOI where the work has one. Four do not,

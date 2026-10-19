@@ -224,7 +224,7 @@ const SYNC_LEDGER = (
         # Every unit above the floor is claimed: the fusion tier by kernel granularity. The symbol
         # tier is CLOSED — the lazy per-mode apply landed (decisions 38/39), so the fused bound IS
         # the physical floor, and that closure is asserted as an equality rather than held open.
-        @test a == b || UNUSED_FUSION in ALL_HOLDERS
+        @test a == b || get(FUSION_GAP_HOLDERS, class, nothing) === UNUSED_FUSION
         @test b == f
       end
     end
@@ -341,15 +341,15 @@ const SYNC_LEDGER = (
     # must be retired in the commit that closes it; leaving it would let a solved problem go on
     # looking like an accepted cost.
     cells = [(s, d, sc) for s in (:RK3, :RK4, :SSPRK3, :RK2) for d in DEALIASINGS for sc in (false, true)]
-    fusion_live = false
+    fusion_live = Set{Symbol}()
     for (scheme, dealiasing, scalar) in cells
       ops = _ops(scheme, dealiasing, scalar)
       achieved, bound = _passes(ops), _fusion_bound(ops)
       for class in CLASSES
-        getproperty(achieved, class) > getproperty(bound, class) && (fusion_live = true)
+        getproperty(achieved, class) > getproperty(bound, class) && push!(fusion_live, class)
       end
     end
-    @test fusion_live                       # else retire UNUSED_FUSION
+    @test fusion_live == Set(keys(FUSION_GAP_HOLDERS))   # each claimed class has a gap, and only those
     # (MATERIALIZED_SYMBOLS retired 2026-08-06 — its former liveness check is now the
     # "symbol tier stays closed" equality above.)
 

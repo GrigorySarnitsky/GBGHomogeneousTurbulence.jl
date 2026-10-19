@@ -370,11 +370,30 @@ end
 #                      register), so there is no boundary left to hold a gap open.
 #   SCALAR REGISTERS — the scalar's copy register could share a slot; it is deleted outright.
 #   (SHARED FACTOR was retired 2026-08-06 with decision 39.)
-# Every cell now sits AT its liveness bound in every class, forced ones included. The last gap was
-# the archived OU's spectral noise, which could alias the generator's spectral registers but lived on
-# the forcing across an ownership boundary; its holder (OWNERSHIP, OU noise ↔ nonlinear/product)
-# retired with decision 90, which removed the noise from field scale altogether.
-const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims from the one register (audit_ops.jl)
+# The archived OU's spectral noise was a gap too, held by OWNERSHIP (OU noise ↔ nonlinear/product)
+# until decision 90 removed the noise from field scale altogether.
+#
+# From 2026-08-06 every cell was reported AT its bound. That held only because the bound counted the
+# charts as live across the whole step, and every scratch register from its first use to its last; with
+# liveness counted by value (2026-10-19) two gaps show, and both are claimed below. Mask cells of the
+# three-stage and five-stage schemes still sit at the bound.
+const GAP_HOLDERS = let claims = Dict{Tuple{Symbol, Symbol, Bool}, Dict{Symbol, Holder}}()
+  for scheme in (:RK3, :RK4, :SSPRK3, :RK2), scalar in (false, true)
+    if scheme === :RK2
+      for mask in (:TwoThirds, :HouLi)
+        claims[(scheme, mask, scalar)] = Dict(:spectral_vector => IFHEUN_STAGE_REGISTERS)
+      end
+    end
+    displaced = Dict{Symbol, Holder}(:physical_vector => DISPLACED_BESIDE_SPENT_CHARTS)
+    scalar && (displaced[:physical_scalar] = DISPLACED_BESIDE_SPENT_CHARTS)
+    if scheme === :RK2
+      displaced[:spectral_vector] = IFHEUN_STAGE_REGISTERS
+      scalar && (displaced[:spectral_scalar] = IFHEUN_STAGE_REGISTERS)
+    end
+    claims[(scheme, :PhaseShift, scalar)] = displaced
+  end
+  claims
+end   # claims from the one register (audit_ops.jl)
 
 
 
@@ -642,32 +661,55 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
   end
 
   @testset "liveness bounds and the gap register" begin
-    # Every unforced cell sits AT its bound in every class (decision 40): the slot=register merge
-    # closed the chart gap, deleting the cache's spectral scratch closed the ownership gap, and
-    # deleting the scalar copy register closed the scalar gap — each holder retired in the same
-    # commit. This equality CAN fail: extend a register's life past the schedule's need (or add a
-    # resident buffer) and the ledger rises off the bound with no holder to claim it.
-    for (scheme, ops_of) in ((:RK3, rk3_ops), (:SSPRK3, ssprk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
-      @test peak_liveness(ops_of(scalar)) == BASE[(scheme, :TwoThirds, scalar)]
+    # Every cell's ledger is held against the value-level bound of its own op list, and the register
+    # works both ways: a class above its bound with no claim fails, and so does a claim on a class at
+    # its bound. This CAN fail in either direction: add a resident buffer, or keep an array the order
+    # does not need, and the ledger rises off the bound with no holder; take a win, and its claim is
+    # left naming nothing.
+    for ((scheme, dealiasing, scalar), achieved) in BASE
+      bound = peak_liveness(_ops(scheme, dealiasing, scalar))
+      claims = get(GAP_HOLDERS, (scheme, dealiasing, scalar), Dict{Symbol, Holder}())
+      for class in CLASSES
+        gap = getproperty(achieved, class) - getproperty(bound, class)
+        @test gap >= 0                                  # a bound above the ledger is a bookkeeping error
+        @test (gap > 0) == haskey(claims, class)        # every gap claimed, every claim a live gap
+        haskey(claims, class) && @test claims[class] in ALL_HOLDERS
+      end
     end
-    # PhaseShift's displaced-evaluation registers are working values like any other, and its cells
-    # sit at the bound too.
-    @test peak_liveness(rk3_ops(true; phase_shift = true)) == BASE[(:RK3, :PhaseShift, true)]
+    @test Set(keys(GAP_HOLDERS)) ⊆ Set(keys(BASE))      # no claim on a cell the ledger does not hold
 
-    # The OU-forced cell sits at its bound too (decision 90): nothing of the forcing is field-scale,
-    # so the ledger and the bound are the unforced cell's, and the gap register is empty.
+    # The OU-forced cell sits at its bound (decision 90): nothing of the forcing is field-scale, so the
+    # ledger and the bound are the unforced cell's.
     ou_ops = rk3_ops(false; ou = true)
     ou_achieved = _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:ou, :velocity))
     @test peak_liveness(ou_ops) == ou_achieved
-    @test isempty(GAP_HOLDERS)
 
     # The physical-vector floor, in numbers: TWO registers — the chart slots, doubling as the
     # substage recovery registers AND as the quadratic products' in-place targets (decision 41) —
     # with the three vectors retired since decision 37 (the two-chart gap + the product register,
-    # 1.15 GiB at 256³ / Float64) banked, not held.
-    for (scheme, ops_of) in ((:RK3, rk3_ops), (:SSPRK3, ssprk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
-      @test peak_liveness(ops_of(scalar)).physical_vector == 2
+    # 1.15 GiB at 256³ / Float64) banked, not held. PhaseShift's displaced evaluation needs no more,
+    # except beside a scalar, whose primary flux still needs the unshifted velocity: three.
+    for scheme in (:RK3, :RK4, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
+      @test peak_liveness(_ops(scheme, dealiasing, scalar)).physical_vector == (dealiasing === :PhaseShift && scalar ? 3 : 2)
     end
+  end
+
+  @testset "the bound counts values, not arrays" begin
+    # Planted: two arrays of one class, each written and read once, the second only after the first
+    # is spent — one register serves both. The bound counted two while it took an array's first and
+    # last use as its live range.
+    plant = [Op("write", Symbol[], [:ushift]), Op("read", [:ushift], Symbol[]),
+             Op("write", Symbol[], [:ωshift]), Op("read", [:ωshift], Symbol[])]
+    @test peak_liveness(plant).physical_vector == 1
+    # …and an array refilled between two reads is free between the first read and the refill.
+    refill = [Op("write", Symbol[], [:ushift]), Op("read", [:ushift], Symbol[]),
+              Op("write", Symbol[], [:ωshift]), Op("read", [:ωshift], Symbol[]),
+              Op("write", Symbol[], [:ushift]), Op("read", [:ushift], Symbol[])]
+    @test peak_liveness(refill).physical_vector == 1
+    # A value carried between iterations is live at both ends, and nothing else may be read unwritten.
+    @test peak_liveness([Op("read", [:chart_u], Symbol[]), Op("write", Symbol[], [:ushift]),
+                         Op("read", [:ushift], Symbol[])]).physical_vector == 2
+    @test_throws ErrorException peak_liveness([Op("read", [:ushift], Symbol[])])
   end
 
   @testset "the bound still encodes a falsifiable contract" begin

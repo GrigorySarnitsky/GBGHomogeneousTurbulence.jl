@@ -352,6 +352,14 @@ actively check for it.
   no bound challenging it and the ``N^3``-for-``M\times3`` spend violates the "minimal footprint trumps
   compute" invariant. The user: "Stop taking what is in place as an indication that it should be like
   that. Probably you should ask before you dismiss something."
+  Instance (2026-10-19, decision 116): decision 37's fix left the same assumption in a smaller form,
+  standing from decision 40 (2026-08-06). The liveness bound still held the charts live across the whole step, and every
+  register from its first use to its last, so `PhaseShift` and `IFHeun` were reported at their bounds
+  with up to three spare field arrays. One sweep then found four more bounds that could not fail:
+  a transform bound copied from the ledger, a claim test satisfied by the holder existing, a fused
+  bound counting overwritten values, and traffic ideals defaulting to the measured counts. Each was
+  read many times. None was found until a question forced a bound to be recomputed independently,
+  which is the check: for each bound, compute it a second way that does not read the code it judges.
 
 - **Fixing the instance, not the class — and being unable to see it from the inside.** This one is
   different in kind from the others: the rule is *already written down* ("a flagged instance is a

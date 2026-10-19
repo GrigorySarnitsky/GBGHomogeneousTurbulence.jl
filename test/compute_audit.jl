@@ -100,7 +100,13 @@ end
 # stage (3 c2r per evaluation) — retired when the same-stage freshness contract landed on the
 # displaced scratch, and PhaseShift now costs exactly double its mask cell for the velocity and the
 # scalar alike (the memory↔compute trade priced clean on both sides).
-const TRANSFORM_BOUND = Dict(key => base for (key, base) in TRANSFORMS_BASE)
+# The bound is DERIVED from that count, per evaluation times evaluations per step, never read from
+# the ledger it judges: until 2026-10-19 it was a copy of TRANSFORMS_BASE, so `actual == bound` held by
+# construction and the minimality test below could not fail.
+const TRANSFORM_BOUND = Dict(
+  (scheme, dealiasing, scalar) => (per = _per_eval(dealiasing, scalar);
+                                   (c2r = per.c2r * _evals(scheme), r2c = per.r2c * _evals(scheme)))
+  for (scheme, dealiasing, scalar) in keys(TRANSFORMS_BASE))
 
 # (SHIFTED-VELOCITY REUSE retired 2026-08-06, decision 45 — the register empty is the assertion.)
 const TRANSFORM_GAP_HOLDERS = Dict{Tuple{Symbol, Symbol, Bool}, Holder}()
@@ -155,24 +161,8 @@ const PASSES_BASE = Dict(
   (:RK2, :PhaseShift, true)  => (spectral_vector = 53, physical_vector = 21, spectral_scalar = 35, physical_scalar = 4, real_spectral_scalar = 0),
 )
 
-# Named holders for the fusion gaps, by shape class (the causes are configuration-independent).
-# The physical-side and configuration classes sit AT their bounds in every cell — the cross
-# products, fluxes, copies, and per-segment kernel reads are already ideal. Every gap lives in the
-# two spectral classes, and every one is a PF-kernel-granularity artifact of the numpy model — the
-# schedule is already minimal in VALUES (the liveness audit); the passes above the fused ideal are
-# re-reads and re-writes between the op-per-kernel boundaries:
-#   spectral_vector / spectral_scalar — UNFUSED STAGE PIPELINE: projection⊙dealias → accumulate →
-#     fused-exponential update still run as one kernel per op where one fused per-mode kernel could
-#     read (product, state) and write (state, accumulator) once. FACTOR MATERIALIZATION is RETIRED
-#     (decision 39): the fused exponential computes the factor in register, exactly what the holder
-#     asked of the backend — the pre-registered round-3 candidate (the two-output stage kernel) is
-#     what remains of this class.
-# Claimed by the shared register's holder (audit_ops.jl), the same object the optimality audit's
-# pass floor names, so the gap is one entry on the list, not two.
-const FUSION_GAP_HOLDERS = Dict(
-  :spectral_vector => UNUSED_FUSION,
-  :spectral_scalar => UNUSED_FUSION,
-)
+# The fusion gaps' claims, by shape class, live in audit_ops.jl (FUSION_GAP_HOLDERS), shared with the
+# optimality audit's pass floor.
 
 # The COINCIDENT-FACTORS residual (Sc = 1, both rates unarmed ⇒ ℰ_ν ≡ ℰ_κ) is RETIRED with the
 # factor itself (decision 39): no factor field is built for the coincidence to save — each fused
