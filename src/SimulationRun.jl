@@ -105,7 +105,7 @@ with `scalar = nothing` carries none, and no scalar setting can be given to it.
 - `variance = 1.0` — the scalar variance ``\\langle\\varphi^{2}\\rangle``: the value the scalar is
   seeded at, and the target a `forcing` holding the whole field's variance takes when its own is
   left out — a [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController)
-  or a `VarianceRescaling(over = :total)` — as the run's stated kinetic energy fills the
+  or a `VarianceRescaling(over = :total)` — as the run's kinetic energy ``k`` fills the
   velocity's forcing (see [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing)).
   An adopted `state` keeps the variance it holds.
 
@@ -113,8 +113,8 @@ with `scalar = nothing` carries none, and no scalar setting can be given to it.
   `DeferredForcing`; the velocity and the scalar are forced independently. No scalar stationary
   state is modelled, so a forcing needing one — a `VarianceRescaling(over = :band)` target, a
   [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) rate, a
-  [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) variance — states it. From
-  the flow's state a deferred forcing takes only what is the flow's: a `VarianceController` its
+  [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) variance — must be given
+  its own. From the flow's stationary state a deferred forcing takes only what is the flow's: a `VarianceController` its
   omitted `turnover_time`, the large-eddy time ``2k/(3\\varepsilon)``, and a `StochasticOU` the box
   time a correlation time in box units is converted with.
 
@@ -287,18 +287,18 @@ with [`current_time`](@ref) / [`current_step`](@ref).
 By default the run is forced and stationary, set up for the stationary state it is predicted to
 settle in: the kinetic energy ``k`` and the dissipation rate ``\\varepsilon``.
 
-State that state once — by `kinetic_energy`, by `dissipation`, or by the target of a velocity
-forcing that holds one of the two — and the other member is predicted; stating it twice is an
-`ArgumentError`, and stating nothing means ``k = 1.5``. The prediction is
-[`predicted_stationary_state`](@ref)'s. It goes through the kinetic energy in box units (lengths
-in the box side ``L``, velocities in ``(\\varepsilon L)^{1/3}``),
-``\\tilde{k} = k/(\\varepsilon L)^{2/3}``, of the velocity forcing
-([`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units)),
-with ``L`` the box side, and the share of the energy in the forced band, the shells the forcing acts on
-([`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction)).
+Give one of the two — as `kinetic_energy`, as `dissipation`, or as the target of a velocity forcing
+that holds one of them — and the other is predicted. Giving two is an `ArgumentError`, and giving
+none means ``k = 1.5``. The prediction is made by [`predicted_stationary_state`](@ref) from the
+forcing's kinetic energy in box units, ``\\tilde{k} = k/(\\varepsilon L)^{2/3}`` with ``L`` the box
+side ([`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units)).
+Giving ``k`` yields ``\\varepsilon = (k/\\tilde{k})^{3/2}/L``, and giving ``\\varepsilon`` yields
+``k = \\tilde{k}(\\varepsilon L)^{2/3}``.
 
-A velocity forcing whose strength is left out takes it from that state (see
-[`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing)). The default,
+A velocity forcing whose strength is left out takes it from that stationary state (see
+[`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing)). One that holds its
+band's energy takes the band's share of ``k``,
+[`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction). The default,
 [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) with its injection rate filled
 so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather than supplied:
 
@@ -338,10 +338,10 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     that does not start at shell 1 or ends at shell 1.
 
   * When `viscosity` is supplied, it is used directly; the two are alternatives, and
-    passing both raises an `ArgumentError`. A covered forcing's state is still predicted, at the
+    passing both raises an `ArgumentError`. A covered forcing's stationary state is still predicted, at the
     ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3}L^{4/3}/\\nu`` the given ``\\nu`` gives. For a run the prediction
-    does not cover, nothing is predicted: the velocity is seeded at the stated ``k``, and an unforced
-    run may state ``\\varepsilon`` as well, since a decaying initial state has no balance tying the two.
+    does not cover, nothing is predicted: the velocity is seeded at the given ``k``, and an unforced
+    run may be given ``\\varepsilon`` as well, since a decaying initial state has no balance tying the two.
 
 # Arguments
 
@@ -386,9 +386,9 @@ The run group, `kwargs...` in both signatures
   then be given.
 - `velocity_forcing = ConstantPower()` — the velocity forcing, an [`AbstractForcing`](@ref) (or a
   `DeferredForcing`, a forcing named by its keywords before the domain exists); the default injects
-  the state's ``\\varepsilon``. A deferred forcing may leave its strength out for the state to fill.
-  A stated target is a statement of the run's state, so giving `kinetic_energy` or `dissipation`
-  beside it is refused; under a derived ``\\nu``, a forcing that holds neither quantity draws the
+  the stationary state's ``\\varepsilon``. A deferred forcing may leave its strength out for the run
+  to fill. A target given to the forcing already gives the stationary state, so giving
+  `kinetic_energy` or `dissipation` beside it is refused; under a derived ``\\nu``, a forcing that holds neither quantity draws the
   warning above.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the random
   seed, for the velocity and the scalar alike (each shell-summed spectrum peaks at
@@ -439,7 +439,7 @@ The domain-building and domain-taking forms, with the viscosity derived or suppl
 # Derived viscosity — a 128³ forced-stationary run, ν set from the resolution criterion:
 sim = Simulation(grid_points_per_axis = 128)
 
-# The same, stated by its dissipation rate, or held at k by a controller
+# The same, given its dissipation rate, or held at k by a controller
 # taking k from the state:
 sim = Simulation(grid_points_per_axis = 128, dissipation = 0.4)
 sim = Simulation(grid_points_per_axis = 128, velocity_forcing = VarianceController())
@@ -548,10 +548,10 @@ end
 
 function _require_one_source(sources)
   length(sources) <= 1 ||
-    throw(ArgumentError("the run's stationary state is stated twice, by " * join(sources, " and ") *
-                        ". State it once — the kinetic energy k, the dissipation rate ε, or the " *
+    throw(ArgumentError("the run's stationary state is given twice, by " * join(sources, " and ") *
+                        ". Give it once — the kinetic energy k, the dissipation rate ε, or the " *
                         "forcing's target — and the other quantity is predicted from it; leave the " *
-                        "forcing's target out to have it filled from the state."))
+                        "forcing's target out to have it filled from the stationary state."))
   return nothing
 end
 
@@ -583,10 +583,10 @@ the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3
   the box side ``L`` and the largest resolved wavenumber ``\\kappa_{\\max}``.
 - `velocity_forcing` — the velocity forcing, built, or named before its domain exists as a
   [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing). A forcing that
-  states its own target (a [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) injection rate, a [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) or
-  `VarianceRescaling(over = :total)` target) states the state through it.
-- `kinetic_energy`, `dissipation` — the state, stated once: ``k``, ``\\varepsilon``, or neither when the
-  forcing states it. With none of the three, ``k = 1.5``.
+  is given its own target (a [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) injection rate, a [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) or
+  `VarianceRescaling(over = :total)` target) gives the stationary state through it.
+- `kinetic_energy`, `dissipation` — the stationary state, given once: ``k``, ``\\varepsilon``, or
+  neither when the forcing gives it. With none of the three, ``k = 1.5``.
 - `κ_max_η`, `viscosity` — at most one. A resolution ``\\kappa_{\\max}\\eta`` (default 2) fixes the
   Kolmogorov length ``\\eta``, hence ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, and ``\\nu`` follows
   from ``\\varepsilon`` as ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. A given `viscosity` is kept, and
@@ -595,7 +595,7 @@ the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3
 Returns a named tuple `(; kinetic_energy, dissipation, band_kinetic_energy, viscosity, reynolds_box,
 reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` in the domain's element type. A forcing the prediction does not
 cover (an unforced run, a band that does not start at shell 1) has no stationary state to predict,
-and it throws an `ArgumentError`, as does a state stated twice or both `κ_max_η` and `viscosity`.
+and it throws an `ArgumentError`, as does a stationary state given twice or both `κ_max_η` and `viscosity`.
 
 !!! warning "A prediction, not a measurement"
     The values rest on the model's placeholder ``\\tilde{k}`` and ``k_{\\mathrm{band}}/k``, which are

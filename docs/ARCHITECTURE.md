@@ -431,12 +431,12 @@ mode, drawing each amplitude perpendicular to its wavevector. Each forcing has a
 taking no domain, has only the one. The keyword form — `ConstantPower(injection_rate = 0.1)` —
 returns a `DeferredForcing`, materialized when `Simulation` builds the frame, so a case can name its
 forcing before the grid exists. A velocity forcing named so may also leave its strength out, and
-`Simulation` fills it from the run's predicted stationary state: the pair ``(k, \varepsilon)``, stated
+`Simulation` fills it from the run's predicted stationary state: the pair ``(k, \varepsilon)``, given
 once — by `kinetic_energy`, `dissipation`, or a forcing's own target — with the other member, and the
 band's energy ``k_{\mathrm{band}}``, predicted by `predicted_stationary_state` through the forcing's
 ``\tilde{k}`` and ``k_{\mathrm{band}}/k`` (decisions 95, 105). That fills `Linear`'s rate
 ``\varepsilon/(2k_{\mathrm{band}})`` and `VarianceRescaling(over = :band)`'s target ``k_{\mathrm{band}}``
-too. A scalar forcing states its target, since no scalar state is modelled.
+too. A scalar forcing is given its target: no scalar stationary state is modelled.
 
 Which keywords carry defaults follows one test: does the value come from the method, or from the
 run? A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's, so it defaults; what

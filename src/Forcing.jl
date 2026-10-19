@@ -191,7 +191,7 @@ run is set up for:
 
 - `ConstantPower` its `injection_rate`, from the dissipation rate ``\\varepsilon``;
 - `VarianceController` and `VarianceRescaling(over = :total)` their `target`, from the kinetic
-  energy ``k`` — or, bound to the scalar, from the scalar's stated `variance` — and a controller
+  energy ``k`` — or, bound to the scalar, from the scalar's `variance` — and a controller
   its `turnover_time`, from the flow's ``2k/(3\\varepsilon)`` whichever field it drives;
 - `VarianceRescaling(over = :band)` its `target`, from the predicted energy in the band
   ``k_{\\mathrm{band}}``;
@@ -199,13 +199,13 @@ run is set up for:
 - `StochasticOU` its `forcing_variance`, from ``\\varepsilon/T_L`` — the variance whose injection
   ``\\sigma^{2} T_L`` matches ``\\varepsilon`` while ``T_L`` is short.
 
-The state, and ``k_{\\mathrm{band}}`` with it, is the one
+The stationary state, and ``k_{\\mathrm{band}}`` with it, is the one
 [`predicted_stationary_state`](@ref GBGHomogeneousTurbulence.SimulationRun.predicted_stationary_state)
-returns. The deferred `StochasticOU` may state its correlation time in box units, as a multiple of
+returns. The deferred `StochasticOU` may be given its correlation time in box units, as a multiple of
 ``(L^{2}/\\varepsilon)^{1/3}``, which the run converts once into the constant time ``T_L`` the strategy
 holds; its `seed`, left out, is drawn from the run's `rng`. A scalar forcing takes only a
-whole-field target from the run, the scalar's stated `variance`, since no scalar stationary state
-is modelled; anything else it states. Otherwise the keywords and defaults are those of the
+whole-field target from the run, the scalar's `variance`, since no scalar stationary state
+is modelled; anything else it carries. Otherwise the keywords and defaults are those of the
 `domain`-taking forms documented on each strategy.
 
 # Examples
@@ -247,9 +247,9 @@ function _from_design(design, quantity::Symbol, strategy, keyword::Symbol)
   (design === nothing || !haskey(design, quantity) || getfield(design, quantity) === nothing) &&
     throw(ArgumentError("`$strategy(; …)` was given no `$keyword`, and nothing supplies one here: " *
                         "only a `Simulation` fills an omitted target, from the stationary state it " *
-                        "sets up for the velocity or from the scalar's stated `variance`. A forcing " *
-                        "built on a domain by hand, or a scalar forcing needing a quantity no scalar " *
-                        "state models, must state `$keyword`."))
+                        "sets up for the velocity or from the scalar's `variance`. A forcing built on " *
+                        "a domain by hand, or a scalar forcing needing a quantity no scalar " *
+                        "stationary state models, must be given `$keyword`."))
   return getfield(design, quantity)
 end
 
@@ -1003,7 +1003,7 @@ end
 The share of the kinetic energy a flow driven by `forcing` holds in its forced band, in its
 stationary state: ``k_{\\mathrm{band}}/k``, with ``k_{\\mathrm{band}} = \\tfrac{1}{2}\\sum_{\\text{band}}
 \\lvert\\hat{\\boldsymbol{u}}\\rvert^{2}`` over the shells `lowest_shell` to `highest_shell`. A run uses it
-to set a strength that is stated through the band: the rate of [`Linear`](@ref),
+to set a strength defined through the band: the rate of [`Linear`](@ref),
 ``A = \\varepsilon/(2 k_{\\mathrm{band}})``, and the target of `VarianceRescaling(over = :band)`, which
 is ``k_{\\mathrm{band}}`` itself. The band that holds everything but the mean (`highest_shell = Inf`) has
 the fraction 1.
@@ -1453,9 +1453,9 @@ function _completed(d::DeferredForcing{StochasticOU}, design)
     correlation_time = p.correlation_time
   else
     (design === nothing || !haskey(design, :box_time) || design.box_time === nothing) &&
-      throw(ArgumentError("`StochasticOU(; …)` states its correlation time in box units, (L²/ε)^{1/3}, " *
+      throw(ArgumentError("`StochasticOU(; …)` was given its correlation time in box units, (L²/ε)^{1/3}, " *
                           "and nothing here supplies ε to convert it: only a `Simulation` does, from " *
-                          "the stationary state it sets up for the velocity. State `correlation_time` " *
+                          "the stationary state it sets up for the velocity. Give `correlation_time` " *
                           "instead."))
     correlation_time = p.correlation_time_in_box_units * design.box_time
   end
