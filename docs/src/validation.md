@@ -1,5 +1,8 @@
 # Validation — code-to-code comparison against TurTLE
 
+!!! info "Written by AI, not regularly reviewed"
+    This page is written by AI and is not reviewed regularly by a human.
+
 !!! note "Comparison completed 2026-08-28"
     Both legs of the comparison have run and the results below are measured. The initial state
     and all five reference-data files are published as release assets; every number on this page is

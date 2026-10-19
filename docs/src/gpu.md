@@ -1,5 +1,8 @@
 # Memory footprint on a GPU
 
+!!! info "Written by AI, not regularly reviewed"
+    This page is written by AI and is not reviewed regularly by a human.
+
 A run goes on a GPU through the `array_family` keyword of [`Simulation`](@ref): `CuArray` for an NVIDIA card, with [`CUDA`](https://cuda.juliagpu.org/stable/) added to your
 environment, or `ROCArray` for an AMD card, with [`AMDGPU`](https://amdgpu.juliagpu.org/stable/). Its `element_type` keyword sets the precision. This
 page answers the question a GPU run meets first, whether a grid fits on the card; it also describes how

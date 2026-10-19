@@ -310,7 +310,7 @@ unit,words,longest_paragraph,admonitions
 "State.md § The state",47,47,0
 "api.md § API overview",415,307,0
 "gpu.md § Fields larger than GPU memory",462,182,1
-"gpu.md § Memory footprint on a GPU",93,93,0
+"gpu.md § Memory footprint on a GPU",115,93,1
 "gpu.md § What a run keeps in memory",411,163,0
 "index.md § Components",350,324,0
 "index.md § GBGHomogeneousTurbulence.jl",130,82,0
@@ -350,4 +350,4 @@ unit,words,longest_paragraph,admonitions
 "validation.md § Robustness across integrators: `IFLowStorageRK4` at its adap",249,158,0
 "validation.md § The physics point",232,131,0
 "validation.md § The shared initial state, and the import witnesses",197,102,0
-"validation.md § Validation — code-to-code comparison against TurTLE",191,132,1
+"validation.md § Validation — code-to-code comparison against TurTLE",213,132,2
