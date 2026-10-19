@@ -3445,10 +3445,11 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     bound equals the ledger, so nothing was hidden there. The traffic ideals are now the band's
     entries, or the modes truncation zeroes, and the whole-field sweeps are claimed by name.
 
-    The synchronization floors are left as they are and put to the owner. They take the run's cadence
-    as given: the turnover clock and the stationarity detector each cost one crossing per iteration
-    because each decides on the host every iteration, and a decision taken less often would cost
-    less.
+    The optimality audit also counts two GPU-to-CPU waits as unavoidable that are so only because
+    of how often their check runs: the turnover clock's ``k`` and ``\varepsilon``, read every
+    iteration, and the warm-up test's derivative skewness, read at every sample. A less frequent
+    check would wait less. The owner kept both counted as
+    unavoidable for now.
 
 ## References
 
