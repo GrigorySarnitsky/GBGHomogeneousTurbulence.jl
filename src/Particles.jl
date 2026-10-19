@@ -132,7 +132,9 @@ advect!(Heun(), tracers, u_end, domain, buffers, dt)
 
 Read the particle state straight off the struct's own fields — the positions are
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)s, and raw arrays and
-counts come from `GBGPeriodicFields`' `point_positions` and `npoints`, never from accessors of
+counts come from `GBGPeriodicFields`'
+[`point_positions`](@extref GBGPeriodicFields GBGPeriodicFields.Points.point_positions) and
+[`npoints`](@extref GBGPeriodicFields GBGPeriodicFields.Points.npoints), never from accessors of
 this package. Passing `unwrapped = true` additionally tracks the winding-preserving
 unwrapped positions `unwrapped_positions` serves — the wrapped positions stay the dynamical
 state either way. The velocities are a *deposited observable*, not tracer state: the particle form
@@ -775,7 +777,9 @@ the periodic box. These are the positions a mean-square-displacement or dispersi
 needs: those are functions of the displacement ``\\boldsymbol{X}(t) - \\boldsymbol{X}(0)``, with
 ``\\boldsymbol{X}`` a tracer's position, which box-wrapped
 positions cannot supply across a crossing. Accumulating such statistics over them — on the raw
-`(M, 3)` array `GBGPeriodicFields`' `point_positions` extracts — is the caller's analysis.
+`(M, 3)` array `GBGPeriodicFields`'
+[`point_positions`](@extref GBGPeriodicFields GBGPeriodicFields.Points.point_positions) extracts —
+is the caller's analysis.
 
 The unwrapped positions exist only when the tracer set was built with `unwrapped = true`; reading
 an untracked set throws an `ArgumentError` (which is why this throwing read exists while the plain

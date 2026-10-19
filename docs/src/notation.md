@@ -40,7 +40,7 @@ The Code column gives the name each symbol carries in the package.
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | `positions`, a field of [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers) |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the run's current time ``t_n``, between [iterations](#Vocabulary) | [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) |
-| ``M`` | the number of tracer particles | `npoints` of those `positions` |
+| ``M`` | the number of tracer particles | [`npoints`](@extref GBGPeriodicFields GBGPeriodicFields.Points.npoints) of those `positions` |
 
 ## Parameters
 
