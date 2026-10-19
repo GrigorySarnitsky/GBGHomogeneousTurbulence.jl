@@ -460,11 +460,6 @@ domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
 sim = Simulation(domain; viscosity = 1e-2)
 ```
 
-Displaying the run — a bare `sim` at the REPL, or the constructor without a trailing `;` in a
-notebook — prints where each part lives, then what a `run!` callback may read without computing,
-each as the callback writes it: the state's spectral representations, the cache's deposited reads,
-and the tracer positions.
-
 !!! note "The default holds the injection rate, so the kinetic energy is free"
     `ConstantPower` injects the stationary state's ``\\varepsilon`` at every stage and never measures ``k``,
     which settles where the true ``\\tilde{k}`` puts it and fluctuates with the cascade. It was chosen as the
