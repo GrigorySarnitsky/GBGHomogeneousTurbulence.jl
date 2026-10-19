@@ -1332,29 +1332,27 @@ end
     run!(callback, sim; dt = nothing)
     run!(sim; dt = nothing) do sim … end
 
-Advance `sim` until the stopping criterion `callback` returns `false`. The second form passes the
-criterion as a
+Advance `sim` until `callback` returns `false`. A *callback* is a function `run!` calls at fixed
+points of its loop: once at the seeded initial state, and after every iteration. It reads the state
+and the cached observables, records what it wants, and returns `true` to continue or `false` to
+stop, so it is also the run's stopping criterion. Any other return throws an `ArgumentError`. The
+second form passes the callback as a
 [`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
 
-Once at the seeded initial state, before any advance, and after every iteration, `run!` calls
-`callback(sim)`. The criterion reads the state and the cached observables, records what it wants,
-and returns `true` to continue or `false` to stop. Any other return throws an `ArgumentError`.
+After a `true`, the next iteration runs: the timestep from the cached maximum speed, the step, the
+tracer advance, and the closing deposits. A run of ``n`` iterations therefore calls the callback
+``n + 1`` times, and the last call reads the final state before the stop.
 
-Only then does the next iteration run: the timestep from the cached maximum speed, the step, the
-tracer advance, and the closing deposits. A run of ``n`` iterations therefore calls the criterion
-``n + 1`` times — the first before any step, the last after the final one, with statistics recorded
-before the stop.
-
-Stopping is the criterion's decision on observables, never a run option. A span of simulation
+Stopping is the callback's decision on observables, never a run option. A span of simulation
 time compares [`current_time`](@ref) against a target; a step budget compares
 [`current_step`](@ref); an eddy-turnover budget accumulates ``\\Delta t \\varepsilon/k`` over each timestep ``\\Delta t`` from the
 observables it computes; spin-up to stationarity is the packaged [`StationarityCriterion`](@ref).
-Whatever the criterion needs beyond the cached observables it computes itself, as often as it
+Whatever the callback needs beyond the cached observables it computes itself, as often as it
 chooses, with the exported reductions and recoveries; [`every_steps`](@ref) and
 [`every_time`](@ref) decide how often.
 
 # Arguments
-- `callback` — the stopping criterion, called as `callback(sim)`; returns `true` to continue,
+- `callback` — a function of the run, called as `callback(sim)`; returns `true` to continue,
   `false` to stop.
 - `sim` — the [`Simulation`](@ref) to advance.
 - `dt = nothing` — pass a value to force that fixed timestep on every iteration (a code-to-code

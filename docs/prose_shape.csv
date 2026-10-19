@@ -289,7 +289,7 @@ unit,words,longest_paragraph,admonitions
 "SimulationRun.jl :: flow_parameters(sim)",93,92,0
 "SimulationRun.jl :: predicted_stationary_state(domain; velocity_forcing = Consta",344,112,1
 "SimulationRun.jl :: read_simulation(parent::HDF5.H5DataStore, name::AbstractStri",204,99,0
-"SimulationRun.jl :: run!(callback, sim; dt = nothing)",304,77,0
+"SimulationRun.jl :: run!(callback, sim; dt = nothing)",307,77,0
 "SimulationRun.jl :: warmup!(sim; dt = nothing, kwargs...)",150,55,0
 "SimulationRun.jl :: write_simulation(parent::HDF5.H5DataStore, name::AbstractStr",149,94,0
 "SimulationRun.md § Advancing the run",27,27,0
