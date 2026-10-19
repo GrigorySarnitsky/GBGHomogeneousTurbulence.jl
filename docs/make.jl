@@ -78,7 +78,6 @@ GBGCodingTools.makedocs(ROOT;
   plugins   = [links],
   pages = [
     "Home"              => "index.md",
-    "Memory footprint"  => "gpu.md",
     "Notation"          => "notation.md",
     "API"  => Any[
       "Overview"               => "api.md",
@@ -93,6 +92,7 @@ GBGCodingTools.makedocs(ROOT;
       "Propagator"             => "api/Propagator.md",
       "Particles"              => "api/Particles.md",
     ],
+    "Memory footprint"  => "gpu.md",
     "Validation" => "validation.md",
     "Design & Internals" => Any[
       "Architecture"   => "architecture.md",
