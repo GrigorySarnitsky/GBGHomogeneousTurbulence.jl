@@ -259,5 +259,5 @@ sim = Simulation(domain; viscosity = 9.032e-3,
                  field_integration_scheme = IFSSPRK3(),
                  particles = ParticleTracking(imported_tracers; particle_integration_scheme = AdamsBashforth(order = 4)),
                  state = imported_state)
-run!(observation, sim; dt = 0.002)   # the callback records k, ε, and ρ_u online
+run!(record, sim; dt = 0.002)   # a stopping criterion that records k, ε, and ρ_u online
 ```

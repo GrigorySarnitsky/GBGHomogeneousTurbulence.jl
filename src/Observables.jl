@@ -241,7 +241,7 @@ in the field's own real element type: the sides ``l``, then ``k(l)`` and ``\\var
 
 !!! warning "An occasional diagnostic, not a per-step one"
     Each of the ``N`` sides is a weighted reduction over the ``N^{3}`` coefficients of `û`, so the
-    cost grows as ``N^{4}``. Measure it at observations, not inside a stepping loop. In `Float32` the
+    cost grows as ``N^{4}``. Measure it between iterations now and then, not after every one. In `Float32` the
     subtraction above costs digits where ``k(l) \\ll k``, at the smallest sides of a field with little small-scale
     energy; measure in `Float64` where those sides matter.
 

@@ -56,8 +56,8 @@ warmup!(sim)
 # rate the run was set up for, so the kinetic energy k settles freely — read its docstring before measuring k.
 
 t_end = current_time(sim) + 5.0
-run!(sim) do s              # observe and advance: the callback reads the run,
-    current_time(s) < t_end # records what it wants, and decides continuation
+run!(sim) do s              # the stopping criterion reads the run, records
+    current_time(s) < t_end # what it wants, and decides continuation
 end
 
 # The state is always current. The observables cache serves what the last iteration (one advance of

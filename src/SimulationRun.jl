@@ -498,7 +498,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB, PT}
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
   field_integration_scheme::IG
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
-  cache::DF                # ObservablesCache: what the last iteration deposited, for an observation to read
+  cache::DF                # ObservablesCache: what the last iteration deposited, read between iterations
   tracers::TR              # Tracers, or nothing — trajectory STATE only
   particle_integration_scheme::PI  # AbstractParticleIntegrator, or nothing
   particle_buffers::PB     # ParticleIntegratorBuffers for that scheme, or nothing
@@ -905,7 +905,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   # resident and leaves the rebuild cadence to the caller's callback; `:none` allocates nothing.
   particle_traversal = (tracers === nothing || particles.traversal_mode === :none) ? nothing :
                        ParticleTraversal(domain, tracers; automatic = particles.traversal_mode === :automatic)
-  deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
+  deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant the stopping criterion reads is t₀
   tracers === nothing ||
     deposit!(cache, tracers, velocity_physical(cache); traversal = particle_traversal)
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar = carries_scalar),
@@ -1257,7 +1257,7 @@ A predicate on a run that is `true` on every `n`-th step — the cadence test a
 
 The argument `n` is the period in steps, a positive integer; the returned function `fires(sim)` is
 `true` when [`current_step(sim)`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step) is a multiple of `n` — including at step `0`, the seeded
-state `run!` observes first. For a cadence in simulation time use [`every_time`](@ref). The example
+state. For a cadence in simulation time use [`every_time`](@ref). The example
 passes the callback as a
 [`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
 
@@ -1285,7 +1285,7 @@ fixed intervals of time under the adaptive step: sample a Lagrangian statistic e
 record a spectrum, rebuild the tracer traversal order under `traversal_mode = :manual`.
 
 The argument `period` is the interval in simulation time, positive. The returned function
-`fires(sim)` is `true` at the first observation at or past each multiple
+`fires(sim)` is `true` at the first instant at or past each multiple
 ``0, \\Delta T, 2\\Delta T, \\ldots`` of the period ``\\Delta T`` — at the seeded state first, since
 it lies on ``0`` — so the firing instants land within one step past the multiples, never before
 them. A step that jumps over two multiples fires once, not twice, and the next firing is at the next
@@ -1330,31 +1330,31 @@ end
     run!(callback, sim; dt = nothing)
     run!(sim; dt = nothing) do sim … end
 
-Observe and advance `sim` until the observation stops it. The second form passes the callback as a
+Advance `sim` until the stopping criterion `callback` returns `false`. The second form passes the
+criterion as a
 [`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
 
-After every iteration — and once at the seeded initial state, before any advance — the `callback`
-observes the run as `callback(sim)`: it reads the state and the cached observables, records
-what it wants, and returns `true` to continue or `false` to stop. Any other return throws an
-`ArgumentError`.
+Once at the seeded initial state, before any advance, and after every iteration, `run!` calls
+`callback(sim)`. The criterion reads the state and the cached observables, records what it wants,
+and returns `true` to continue or `false` to stop. Any other return throws an `ArgumentError`.
 
 Only then does the next iteration run: the timestep from the cached maximum speed, the step, the
-tracer advance, and the closing deposits. A run of ``n`` iterations therefore observes ``n + 1``
-instants — the first before any step, the last after the final one, with statistics recorded
+tracer advance, and the closing deposits. A run of ``n`` iterations therefore calls the criterion
+``n + 1`` times — the first before any step, the last after the final one, with statistics recorded
 before the stop.
 
-Stopping is the observation's decision on observables, never a run option. A span of simulation
+Stopping is the criterion's decision on observables, never a run option. A span of simulation
 time compares [`current_time`](@ref) against a target; a step budget compares
 [`current_step`](@ref); an eddy-turnover budget accumulates ``\\Delta t \\varepsilon/k`` over each timestep ``\\Delta t`` from the
 observables it computes; spin-up to stationarity is the packaged [`StationarityCriterion`](@ref).
-Whatever the callback needs beyond the cached observables it computes itself, at its own cadence,
-with the exported reductions and recoveries; [`every_steps`](@ref) and [`every_time`](@ref) are
-the cadence tests for that.
+Whatever the criterion needs beyond the cached observables it computes itself, as often as it
+chooses, with the exported reductions and recoveries; [`every_steps`](@ref) and
+[`every_time`](@ref) decide how often.
 
 # Arguments
-- `callback` — the observation, called as `callback(sim)`; returns `true` to continue, `false` to
-  stop.
-- `sim` — the [`Simulation`](@ref) to observe and advance.
+- `callback` — the stopping criterion, called as `callback(sim)`; returns `true` to continue,
+  `false` to stop.
+- `sim` — the [`Simulation`](@ref) to advance.
 - `dt = nothing` — pass a value to force that fixed timestep on every iteration (a code-to-code
   comparison, a convergence study); `nothing` keeps the adaptive step, chosen anew each iteration.
 
@@ -1380,7 +1380,7 @@ function run!(callback, sim::Simulation; dt = nothing)
   while true
     keep = callback(sim)
     keep isa Bool ||
-      throw(ArgumentError("the observation callback must return a Bool — true to continue the " *
+      throw(ArgumentError("the stopping criterion must return a Bool — true to continue the " *
                           "run, false to stop it; it returned a $(typeof(keep))"))
     keep || break
     advance!(sim; dt)
@@ -1467,7 +1467,7 @@ function _push_and_test!(m::StationarityMonitor, elapsed_turn, ε, φ2, S)
 end
 
 # Compute the signals from `sim` (only when a sample is due — the skewness inverse-transforms a
-# NINE-component rank-2 field, and is the only observation here that does) and test.
+# NINE-component rank-2 field, and is the only measurement here that does) and test.
 function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn, ε)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
   φ2 = m.gate_scalar ? (sim.state.scalar_spectral === nothing ? NaN : scalar_variance(sim.state.scalar_spectral)) : 0.0
@@ -1483,7 +1483,7 @@ _scalar_forced(sim::Simulation) = sim.state.scalar_spectral !== nothing && !(sim
                             min_turnovers = 5, window_turnovers = 4, tolerance = 0.05,
                             skewness_floor = 0.1, max_turnovers = 60)
 
-The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
+The packaged spin-up stopping criterion for [`run!`](@ref): it watches the run settle into
 statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting
 spin-up, and [`warmup!`](@ref) is the one-line shorthand for exactly that call. Use it before measurement on any freshly
 seeded forced run. A freely decaying run (`NoForcing()`) has no stationary state to detect — its
@@ -1509,7 +1509,7 @@ test passes only by chance.
   ``S \\approx -0.5``. It is off by default, and turning it on is the stricter spin-up: the
   ``\\varepsilon`` gate alone can be satisfied by a field whose cascade is not yet developed, so a
   run whose measurement depends on the small scales should set it. The cost is why it is not the
-  default — the skewness is the only observation here that transforms a rank-2 field, nine
+  default — the skewness is the only measurement here that transforms a rank-2 field, nine
   component transforms and a per-call tensor allocation larger than the resident working set (see
   [`derivative_skewness`](@ref GBGHomogeneousTurbulence.Observables.derivative_skewness)). When it
   is on, the skewness is measured on the criterion's own sampling interval — one
@@ -1526,7 +1526,7 @@ test passes only by chance.
 - `max_turnovers` — the give-up cap: reaching it stops the run with a warning rather than spinning
   forever.
 
-The criterion carries its own observation state (the sampled signals and the turnover clock), so
+The criterion carries its own state (the sampled signals and the turnover clock), so
 build a fresh one per run.
 
 # Fields
@@ -1576,8 +1576,8 @@ end
 
 function (criterion::StationarityCriterion)(sim::Simulation)
   if !criterion.started
-    # The scalar gate binds only when the run's scalar is forced — resolved at the first observation,
-    # where the criterion first sees the run it observes.
+    # The scalar gate binds only when the run's scalar is forced — resolved at the criterion's first
+    # call, where it first sees the run.
     criterion.monitor.gate_scalar = criterion.gate_scalar && _scalar_forced(sim)
     criterion.last_time = current_time(sim)
     criterion.started = true
@@ -1618,9 +1618,9 @@ run!(StationarityCriterion(; kwargs...), sim; dt)
 ```
 
 — it spins `sim` up to a statistically stationary state before measurement and returns it, by
-running `run!`'s loop, which observes the seeded state and then each completed iteration, with the
-packaged stationarity observation. For a fixed spin-up
-budget, write the three-line budget callback instead (see [`run!`](@ref)).
+running `run!`'s loop, which hands the seeded state and then each completed iteration to the
+packaged stationarity criterion. For a fixed spin-up budget, write the three-line budget criterion
+instead (see [`run!`](@ref)).
 
 # Arguments
 - `sim` — the run.

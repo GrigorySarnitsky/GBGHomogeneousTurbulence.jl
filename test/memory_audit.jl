@@ -510,7 +510,7 @@ end   # claims from the one register (audit_ops.jl)
 
   @testset "no field-scale storage escapes both ledgers" begin
     # The closure that keeps the frame hole shut. Walk a whole live `Simulation` — frame, state,
-    # observation cache, generator, scheme registers, tracers — and require the total to equal
+    # observables cache, generator, scheme registers, tracers — and require the total to equal
     # frame + working set, cell by cell. A future buffer that neither table names fails here
     # whichever object it hangs off, so residency can no longer be added anywhere unnoticed.
     for scheme in (:RK3, :RK4, :SSPRK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),

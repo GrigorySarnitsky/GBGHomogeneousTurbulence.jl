@@ -64,8 +64,8 @@ const REALITY_CHECK_BYTES = 8 * 4 * N^2 * sizeof(ComplexF64)
 
 bound(; transforms = 1) = field_threshold(VECTOR_BYTES; components = transforms)
 
-# A callback that lets `run!` take exactly one iteration: `true` at the seeded instant it observes
-# first, `false` after the iteration. Named, since `@alloc_below` evaluates its call twice.
+# A stopping criterion that lets `run!` take exactly one iteration: `true` at the seeded instant it
+# reads first, `false` after the iteration. Named, since `@alloc_below` evaluates its call twice.
 const CALLBACK_CALLS = Ref(0)
 one_iteration(sim) = isodd(CALLBACK_CALLS[] += 1)
 # `step!` opens an iteration its closing deposit must end before the next can begin.

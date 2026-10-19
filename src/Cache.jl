@@ -1,5 +1,5 @@
 # Cache — the observables cache: the storage where a component of the iteration puts a value another
-# component (or an observation) will read. The design is the no-recompute rule
+# component (or the caller, between iterations) will read. The design is the no-recompute rule
 # (docs/src/observables_cache.md): the schedule is fixed at construction and identical on every
 # iteration; every slot is deposited at the end of the iteration from the state it has just
 # produced; a read either finds a current value or throws — there is no path, internal or on
@@ -10,9 +10,8 @@
 """
     Cache
 
-The observables cache — where the iteration leaves the observables it produces, for the run's own
-components and for any *observation* to read: a measurement the caller makes between iterations,
-from the values the run has already computed. Each value is *deposited*, written together with its
+The observables cache — where the iteration leaves the observables it produces, so that the run's
+own components, and the caller between iterations, read them instead of computing them again. Each value is *deposited*, written together with its
 *epoch*: the version of the state it was computed from, a number raised by one each time a step
 completes or a change made outside the iteration is announced.
 

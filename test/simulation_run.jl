@@ -24,7 +24,7 @@ using Test
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
     @test isfinite(scalar_variance(sim.state.scalar_spectral)) && scalar_variance(sim.state.scalar_spectral) > 0
 
-    # A fixed eddy-turnover budget is a three-line observation: accumulate Δt·ε/k, stop at the target.
+    # A fixed eddy-turnover budget is a three-line stopping criterion: accumulate Δt·ε/k, stop at the target.
     let elapsed = Ref(0.0), last_t = Ref(current_time(sim))
       run!(sim) do s
         ε = dissipation(s.state.velocity_spectral, s.domain, s.generator.conditions.viscosity)
@@ -44,7 +44,7 @@ using Test
         current_time(s) < t0 + 0.3
       end
     end
-    @test !isempty(samples) && all(isfinite, samples)          # the cadenced observation fired
+    @test !isempty(samples) && all(isfinite, samples)          # the periodic sample fired
     @test current_time(sim) ≥ t0 + 0.3
     @test all(0 .<= point_positions(sim.tracers.positions) .< L)        # tracers advected, still in the box
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && isfinite(scalar_variance(sim.state.scalar_spectral))
@@ -82,14 +82,14 @@ using Test
   end
 
 
-  @testset "the observation fires after every iteration — n iterations, n+1 observations" begin
+  @testset "the stopping criterion is called after every iteration — n iterations, n+1 calls" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(7))
     count = Ref(0)
     run!(sim) do s
       count[] += 1
       current_step(s) < 5
     end
-    @test count[] == 6                              # t₀ and the stopping instant both observed
+    @test count[] == 6                              # t₀ and the stopping instant both read
     @test current_step(sim) == 5
   end
 
@@ -137,7 +137,7 @@ using Test
     @test sprint(show, bare) == "Simulation(16×16×16 grid, time 0.0, step 0)"
   end
 
-  @testset "the observation must decide — a non-Bool return throws" begin
+  @testset "the stopping criterion must decide — a non-Bool return throws" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(5))
     @test_throws ArgumentError run!(s -> nothing, sim)     # recorded but did not decide
     @test current_step(sim) == 0                           # nothing advanced
@@ -190,7 +190,7 @@ using Test
     warmup!(sim; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tolerance = 0.3, max_turnovers = 10)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
     @test current_step(sim) > 0
-    # the criterion is an ordinary run! observation
+    # StationarityCriterion is an ordinary run! stopping criterion
     sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(22))
     run!(StationarityCriterion(; gate_skewness = false, min_turnovers = 1, window_turnovers = 1,
                                tolerance = 0.5, max_turnovers = 4), sim2)
@@ -359,7 +359,7 @@ end
 end
 
 
-# Decision 78: the skewness gate is OFF by default. It is the only observation that transforms a
+# Decision 78: the skewness gate is OFF by default. It is the only measurement that transforms a
 # rank-2 field, so it alone builds those plans; a default that turned it on would defeat the
 # deferral above for every default `warmup!`.
 @testset "the packaged criterion does not gate on skewness by default" begin
@@ -380,8 +380,8 @@ end
 end
 
 
-# The cadence predicates (decision 86): a `run!` callback observes every iteration, and these are
-# the tests it gates periodic work on — including the seeded state `run!` observes first.
+# The cadence predicates (decision 86): `run!` calls its stopping criterion after every iteration, and
+# these are the tests it gates periodic work on — including the seeded state it is handed first.
 @testset "every_steps fires on the multiples of its period, from step 0" begin
   fires = every_steps(3)
   seen = Int[]

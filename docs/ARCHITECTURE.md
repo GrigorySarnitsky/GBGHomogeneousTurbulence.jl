@@ -69,9 +69,9 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
 # (k(t) is deliberately not used — under a fixed-injection forcing like this it overshoots, then wanders).
 warmup!(sim)
 
-# Observe and advance. The callback fires after every iteration (and once at the
-# start); it records what it wants and its return decides continuation — stopping
-# is the caller's decision.
+# Advance until the stopping criterion returns false. It is called once at the
+# start and after every iteration; it records what it wants and its return
+# decides continuation — stopping is the caller's decision.
 energies = Float64[]
 t_end = current_time(sim) + 20.0
 run!(sim) do s
@@ -82,11 +82,11 @@ end
 
 The run layer holds the pieces of §4 in one `Simulation` value. Each iteration it chooses a stable
 timestep from the advective-CFL condition over the cached maximum speed (§4.5) and serves the
-deposited observables from the deposit-driven `ObservablesCache` (§4.1). It runs the
-*observation-first loop*: after every iteration, and once at the seeded ``t_0`` — ``n``
-iterations, ``n+1`` observations — the callback reads the run and decides whether it continues
+deposited observables from the deposit-driven `ObservablesCache` (§4.1). Its loop calls
+the *stopping criterion* once at the seeded ``t_0`` and after every iteration — ``n``
+iterations, ``n+1`` calls — which reads the run and decides whether it continues
 (§11 decision 43).
-Spin-up is the packaged `StationarityCriterion` observation, `warmup!` its one-line sugar: it
+Spin-up is the packaged `StationarityCriterion`, `warmup!` its one-line sugar: it
 advances until the flow is statistically stationary, watching the running dissipation
 ``\varepsilon(t)`` — a small-scale signal that settles late — rather than the kinetic energy a
 constant-energy forcing clamps flat, with the velocity-derivative skewness ``S(t)`` an opt-in
@@ -564,10 +564,10 @@ Over it:
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
   the tracer advance on the sample and the deposited endpoint field, the new sample, and the
-  deposit-completeness check. `run!(callback, sim)` is the observation-first loop over it: the callback
-  observes the run after every iteration (and once at the seeded ``t_0``) and its `Bool` return decides continuation —
+  deposit-completeness check. `run!(callback, sim)` is the loop over it, calling the stopping criterion `callback`
+  once at the seeded ``t_0`` and after every iteration; its `Bool` return decides continuation —
   stopping is the caller's decision on observables, never a run option (§11 decision 43).
-- **`StationarityCriterion`** is the packaged spin-up observation, and `warmup!(sim; ...)` its
+- **`StationarityCriterion`** is the packaged spin-up stopping criterion, and `warmup!(sim; ...)` its
   one-line sugar: stationarity detection on the running dissipation ``\varepsilon(t)`` — a
   trailing-window flatness test that gates on ``\varepsilon`` rather than on the clampable
   ``k(t)``, though ``k`` is still measured, to normalize the eddy-turnover clock
@@ -877,7 +877,7 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   ``t \to`` forcing noise ``\to`` fields ``\to`` particles: the generator is block lower-triangular
   (each row reads only itself and the rows above — the fields never read the tracer positions, the
   clock reads nothing), so the flow is a skew product and `advance!` is its Gauss–Seidel sweep in
-  topological order (step the fields, refresh the observation, push the tracers, tick the clock).
+  topological order (step the fields, refresh the cache, push the tracers, tick the clock).
   Triangularity is what licenses the composed propagator: splitting error cannot propagate *up* the
   triangle. It also gives every state slot a litmus. The restart record holds exactly what the
   flow map needs — ``\hat{\boldsymbol{u}}``, ``\hat\varphi``, the tracer positions, and a

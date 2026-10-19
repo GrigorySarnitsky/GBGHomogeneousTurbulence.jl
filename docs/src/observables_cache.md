@@ -31,7 +31,7 @@ choice, the step, the closing *deposits* that write its observables into the cac
 contains the *step*, which advances ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and which is itself
 divided into the *stages* of the time scheme; the particle push and the deposits sit in the
 iteration but outside the step. At each instant ``t_n`` between iterations, before the next one
-begins, sits the *observation*: the caller's callback reads the state and the cache, records what it wants, and
+begins, [`run!`](@ref GBGHomogeneousTurbulence.SimulationRun.run!) calls the *stopping criterion*: it reads the state and the cache, records what it wants, and
 decides whether the run continues. Every rule of the cache architecture below
 follows from one design choice, stated here rather than derived:
 
@@ -86,7 +86,7 @@ fills the cache as it produces the values, and an observable no component comput
 could enter only by making the iteration compute it, which the choice forbids. This test is where
 ``\varepsilon`` and ``k`` fall out: each is one reduction away from the cached fields, but no
 component of the iteration performs that reduction *for the cache*, so it cannot hold them — whoever
-wants one computes it at an observation (§2.4).
+wants one computes it between iterations (§2.4).
 
 One case looks like a counterexample and is worth stating. The constant-energy forcing
 [`VarianceController`](@ref) *does* form the whole-field ``k``, and forms it at every stage, to size its own amplitude. Those values are
@@ -141,15 +141,15 @@ schedule: the maximum speed is reduced from the just-deposited velocity for the 
 timestep choice, and the velocity at the particles is interpolated from that velocity at each particle's new
 position for the next advance's predictor.
 
-**The loop observes, then advances.** The callback reads what it wants and answers whether the run
-continues; only then does the next iteration run. Read from the callback's side it runs *after* each
+**The loop decides, then advances.** The criterion reads what it wants and answers whether the run
+continues; only then does the next iteration run. Read from the criterion's side it runs *after* each
 iteration, which is how [`run!`](@ref) describes it — the same loop, named from the two ends. Stopping
 is thereby the caller's decision on observables, not a run option — a budget in turnovers, for
-instance, is a callback that accumulates ``\Delta t \varepsilon/k`` — the eddy-turnover clock — and says stop. Every instant a run
-reaches is observed exactly once: the first because the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor makes a deposit seeding the initial
-state as it builds the run, the last because the observation that stops the run has already
-read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
-closing deposit has no following iteration to fold into; it serves the final observation instead.
+instance, is a criterion that accumulates ``\Delta t \varepsilon/k`` — the eddy-turnover clock — and says stop. Every instant a run
+reaches is read exactly once: the first because the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor makes a deposit seeding the initial
+state as it builds the run, the last because the call that stops the run has already
+read the state and the cache there. A run of ``n`` iterations makes ``n+1`` calls. Only the last
+closing deposit has no following iteration to fold into; it serves the final call instead.
 Relative to a cacheless solver serving only its own dynamics, the run therefore pays one extra
 closing deposit per run: the state-only share of one first-stage evaluation, one reduction, and one
 interpolation.
@@ -194,8 +194,8 @@ they need themselves, in their own buffer.
 any other — deposited at the iteration's end, at that epoch, and read by the next iteration's timestep choice,
 which does scalar arithmetic on it and measures nothing. It is the only number the iteration
 produces *and still holds at its end*, so it is the only number the cache holds; ``\varepsilon``,
-``k``, or a variance is each one reduction away from the cached fields, performed by the observation
-that wants it (§2.4). A constant-energy forcing does form ``k`` mid-step, but discards it before the
+``k``, or a variance is each one reduction away from the cached fields, performed
+between iterations by its reader (§2.4). A constant-energy forcing does form ``k`` mid-step, but discards it before the
 end — the qualification §1.2 draws.
 
 ### 1.4 What caching costs
@@ -215,7 +215,7 @@ that value whole at its end — §2.3's in-place reuse does not, which is why it
 ``\boldsymbol{\omega}`` in the cache. §2.4's table is therefore a consequence of the configuration
 and the package version, not an interface a reader chooses from.
 
-A reader who needs an absent observable computes it at an observation, from the state or the cached
+A reader who needs an absent observable computes it between iterations, from the state or the cached
 fields, with the exported reductions and the backend's recoveries — in storage they own. The sizes say when that is
 a real decision: a vector field on a grid of ``N`` points per axis is ``3N^{3}`` reals, 384 MiB at ``N = 256`` in double
 precision and 192 MiB in single, so a callback materializing a field-sized diagnostic is buying a
@@ -241,7 +241,7 @@ multiplication), a three-stage scheme, the default constant-power velocity forci
 timestep — and the departures from it are priced in place: [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) and another stage count
 in §2.3, a hand-fixed ``\Delta t`` in §1.4. Whatever the configuration, those axes fix the whole
 of an iteration's work —
-stopping belongs to the observation (§1.3), and nothing a reader does changes what an iteration
+stopping is the caller's decision (§1.3), and nothing a reader does changes what an iteration
 computes.
 
 ### 2.1 The equations
@@ -354,13 +354,13 @@ Both states are always present — the fluid's and the probes'. Tracers consume 
 values at points; they hold no field. The table below lists the observables of this system, one row
 each. Its Cached column takes four values: *yes*, the schedule leaves the observable deposited
 between iterations; *depends*, the observable survives in some configurations and not in others; *no*, a
-genuine observable this schedule does not surface — the value at ``t_n`` is well-defined, and an
-observation builds it itself in one act; and *never*, not an observable at all (§1.2's kind test) —
-there is no moment to date it to, so no act at an observation builds it either.
+genuine observable this schedule does not surface — the value at ``t_n`` is well-defined, and the
+caller builds it between iterations in one act; and *never*, not an observable at all (§1.2's kind test) —
+there is no moment to date it to, so no act between iterations builds it either.
 
 | Observable | Where it lives | Cached | Producer, or reason |
 |:---|:---|:---|:---|
-| ``\boldsymbol{u}`` | physical, grid | yes | the closing recovery; read by the timestep choice, the tracer advance, the advective-term assembly, and observations |
+| ``\boldsymbol{u}`` | physical, grid | yes | the closing recovery; read by the timestep choice, the tracer advance, the advective-term assembly, and the caller |
 | ``\boldsymbol{\omega}`` | physical, grid | yes | the closing recovery; read by the advective-term assembly |
 | ``\varphi`` | physical, grid | yes | the closing recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity at the particles | ``M\times3`` at points | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
@@ -369,7 +369,7 @@ there is no moment to date it to, so no act at an observation builds it either.
 | ``-\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u})``, dealiased | spectral, grid | no | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | not surviving, for the same reason as the row above |
 | ``\boldsymbol{u}\times\boldsymbol{\omega}``, the negated Lamb vector | physical, grid | no | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
-| ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
+| ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | not surviving: no component of the iteration holds one at its end; each is one reduction between iterations (a constant-energy forcing forms ``k`` mid-step and discards it) |
 | ``E(\kappa_n)``, the spectral density at wavenumber shell ``n`` | per shell | no | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | not computed: no iteration forms it |
 | the strain-rate tensor ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | not computed in an iteration; the derivative-skewness stopping test of [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!) materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed point by point inside one averaging pass and never materialized at all, at its own cadence |
@@ -395,7 +395,7 @@ holds it. A local dissipation field is the second, and it comes in two forms: th
 vorticity. The two differ by a divergence, so they agree only in the mean and are not interchangeable
 pointwise. The rate ``\varepsilon = \nu\langle\lvert\boldsymbol{\omega}\rvert^{2}\rangle`` is the
 third — a number, obtained by summing over wavenumbers without building any field, and what
-[`dissipation`](@ref) returns when an observation applies it to the state. It may be written with
+[`dissipation`](@ref) returns when applied to the state between iterations. It may be written with
 either form precisely because they agree in the mean.
 
 **Only one tracer sample reflects the flow.** The velocity at the particles,
@@ -414,8 +414,8 @@ second-order accuracy; it belongs to no instant along the trajectory.
 
 ### 3.1 The calls
 
-The [`run!`](@ref) driver is the observation-first loop: after every iteration (and once at the seeded state) the callback reads the run and its
-return decides continuation. The accessors [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
+The [`run!`](@ref) driver calls the stopping criterion once at the seeded state and after every
+iteration, and the criterion's return decides continuation. The accessors [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 and [`scalar_physical`](@ref) return the
 deposited field, and [`max_speed`](@ref) the deposited number — each a checked read that throws when
 no deposit is current. The closing [`deposit!`](@ref) ends an iteration (the run layer's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) calls it
@@ -444,9 +444,9 @@ cache   = ObservablesCache(domain; scalar = true, number_of_particles = 1024)
 The cache itself is built as §§1–2 describe: automatic contents, closing deposits recorded at the new
 epoch — the velocity sample included, against both epochs — three-valued slot epochs that
 throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the
-deposit-completeness check, and each slot doubling as its producer's register. The loop is the observation-first loop of §1.3:
-`run!(callback, sim)` observes the run after every iteration and once before the first — ``n`` iterations, ``n + 1``
-observations, the seeded ``t_0`` included — and the callback's return decides continuation, so
+deposit-completeness check, and each slot doubling as its producer's register. The loop is §1.3's:
+`run!(callback, sim)` calls the stopping criterion `callback` once before the first iteration and after every one — ``n`` iterations, ``n + 1``
+calls, the seeded ``t_0`` included — and the criterion's return decides continuation, so
 stopping is the caller's decision on observables, not a run option. What §1.3
 records as the storage decision — the nonlinear terms stay in the first stage because the in-place
 products would otherwise destroy the deposited fields — closes the list: every mechanism this page describes exists in the code, and none exists that this

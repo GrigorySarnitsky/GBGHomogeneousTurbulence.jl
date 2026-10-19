@@ -82,8 +82,8 @@ end
 #   deposit!                (src/Propagator.jl)    — the closing max-speed reduction, read back into the
 #                                                    cache's host number (cfl_timestep then does
 #                                                    scalar arithmetic on it — no crossing of its own)
-#   StationarityCriterion   (src/SimulationRun.jl) — the packaged observation's ε and k reductions
-#                                                    (a turnover-budget callback pays the same two)
+#   StationarityCriterion   (src/SimulationRun.jl) — the packaged criterion's ε and k reductions
+#                                                    (a turnover-budget criterion pays the same two)
 #   project_forcing!          (src/Forcing.jl)       — VarianceRescaling's band observable, and the whole-field
 #                                                    observable as well when `over = :total`
 #   add_forcing_source!     (src/Forcing.jl)       — ConstantPower's band observable → the amplitude
