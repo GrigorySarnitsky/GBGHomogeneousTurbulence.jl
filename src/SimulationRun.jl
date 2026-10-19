@@ -30,8 +30,9 @@ The run layer:
 - [`ParticleTracking`](@ref) — the Lagrangian tracking a run carries: the tracer set, seeded or
   adopted, its integration scheme and its traversal mode, as `Simulation`'s `particles` setting.
 - [`predicted_stationary_state`](@ref) — the stationary state a forced run is set up for.
-- [`advance!`](@ref), [`run!`](@ref) — advance one iteration; advance until a *stopping criterion*,
-  a function of the run called at the start and after every iteration, returns `false`.
+- [`advance!`](@ref), [`run!`](@ref) — advance one iteration; advance until the *stopping
+  criterion* returns `false`, the criterion being any function of the run, called at the start and
+  after every iteration.
 - [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged stopping criterion, which ends a
   spin-up once the flow is statistically stationary, and its one-line shorthand.
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count;
@@ -155,7 +156,7 @@ The Lagrangian tracking a run carries, given as the `particles` setting of [`Sim
 the run then advects a tracer set every iteration and records the Lagrangian velocity sample. The
 first form seeds `number_of_particles` tracers uniformly at random in the box, from the run's
 `rng`; the second adopts an existing [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers)
-set (the injection door, decision 83), whose interpolation scheme and unwrapped record are its own
+set, whose interpolation scheme and unwrapped record are its own
 and are not given again. A run built with `particles = nothing` carries no tracers, and no
 tracking setting can be given to it.
 
@@ -268,8 +269,9 @@ A `Simulation` bundles everything the next iteration needs: the [`FixedDomain`](
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and the
 assembly scratch), the chosen field integration scheme, the [`ResolvedFields`](@ref) state (the velocity
 ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), the
-[`ObservablesCache`](@ref) holding what the last iteration deposited, any [`Tracers`](@ref), and a
-clock.
+[`ObservablesCache`](@ref) holding what the last iteration deposited, any [`Tracers`](@ref) with
+their integration scheme, that scheme's registers and the traversal order, the timestep settings,
+and a clock.
 
 Its two forms differ only in where the `FixedDomain` comes from. The *domain-building* form,
 from `grid_points_per_axis` and `side_length`, builds the domain and every piece above it, seeds a
@@ -300,15 +302,16 @@ A velocity forcing whose strength is left out takes it from that stationary stat
 band's energy takes the band's share of ``k``,
 [`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction). The default,
 [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) with its injection rate filled
-so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather than supplied:
+so, holds ``\\varepsilon``. The viscosity is derived from the grid, or supplied:
 
   * When no `viscosity` is passed, the viscosity is derived: ``\\nu`` is set so that
-    ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, the highest Reynolds number the grid resolves, with
-    ``\\kappa_{\\max}`` the [`max_resolved_wavenumber`](@ref) and ``\\eta = (\\nu^{3}/\\varepsilon)^{1/4}`` the
-    Kolmogorov length.
+    ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, with ``\\kappa_{\\max}`` the
+    [`max_resolved_wavenumber`](@ref) and ``\\eta = (\\nu^{3}/\\varepsilon)^{1/4}`` the Kolmogorov
+    length.
 
     The resolution fixes ``\\eta``, hence the box Reynolds number
-    ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, at which ``\\tilde{k}`` is read, and then
+    ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}`` — the highest the grid resolves to that
+    criterion — at which ``\\tilde{k}`` is read, and then
     ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. Since ``\\kappa_{\\max}\\eta = f_{\\mathrm{res}}\\pi\\eta/\\Delta x`` with ``f_{\\mathrm{res}}`` the
     resolved-Nyquist fraction and ``\\Delta x = L/N`` the spacing of ``N`` grid points per side, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default
     ``2/3`` rule. The chosen ``\\nu``, ``k``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda`` are logged, with what
@@ -331,11 +334,11 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     ``k`` the prediction. One holding ``k`` makes ``\\varepsilon``, and with it the resolution, the
     prediction. One holding neither, given its own strength — a [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) rate, a [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU)
     variance, a `VarianceRescaling(over = :band)` target — draws a warning, since ``\\nu`` then
-    describes a state the run may not reach.
+    describes a stationary state the run may not reach.
 
     A forcing the prediction does not cover has no stationary state to derive ``\\nu`` from, and is
-    refused with an `ArgumentError`: an unforced run (`velocity_forcing = NoForcing()`), and a band
-    that does not start at shell 1 or ends at shell 1.
+    refused with an `ArgumentError`: an unforced run (`velocity_forcing = NoForcing()`), a forcing
+    that forces no band of shells, and a band that does not start at shell 1 or ends at shell 1.
 
   * When `viscosity` is supplied, it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError`. A covered forcing's stationary state is still predicted, at the
@@ -376,10 +379,10 @@ The run group, `kwargs...` in both signatures
   [`reynolds_box`](@ref GBGHomogeneousTurbulence.Observables.reynolds_box) and
   [`reynolds_taylor`](@ref GBGHomogeneousTurbulence.Observables.reynolds_taylor) compute them.
 - `kinetic_energy = nothing`, `dissipation = nothing` — the run's stationary state, as its kinetic
-  energy ``k`` or its dissipation rate ``\\varepsilon``. Give at most one, or neither and let the
-  velocity forcing's target state it; with no source at all ``k = 1.5``, an r.m.s. velocity
+  energy ``k`` or its dissipation rate ``\\varepsilon``. Give at most one, or neither when the
+  velocity forcing's target gives it; with no source at all ``k = 1.5``, an r.m.s. velocity
   ``u' = \\sqrt{2k/3} = 1``. The member not given is predicted through ``\\tilde{k}``. An unforced run
-  may give both, as its initial state. The velocity is seeded at the state's ``k``; to start from
+  may give both, as its initial condition. The velocity is seeded at that ``k``; to start from
   another energy, adopt a `state`.
 - `scalar = nothing` — the passive scalar the run carries, a [`PassiveScalar`](@ref) with its
   Schmidt number, seeded variance and forcing; `nothing` carries none, and no scalar setting can
@@ -440,7 +443,7 @@ The domain-building and domain-taking forms, with the viscosity derived or suppl
 sim = Simulation(grid_points_per_axis = 128)
 
 # The same, given its dissipation rate, or held at k by a controller
-# taking k from the state:
+# taking k from the stationary state:
 sim = Simulation(grid_points_per_axis = 128, dissipation = 0.4)
 sim = Simulation(grid_points_per_axis = 128, velocity_forcing = VarianceController())
 
@@ -462,23 +465,23 @@ each as the callback writes it: the state's spectral representations, the cache'
 and the tracer positions.
 
 !!! note "The default holds the injection rate, so the kinetic energy is free"
-    `ConstantPower` injects the state's ``\\varepsilon`` at every stage and never measures ``k``,
+    `ConstantPower` injects the stationary state's ``\\varepsilon`` at every stage and never measures ``k``,
     which settles where the true ``\\tilde{k}`` puts it and fluctuates with the cascade. It was chosen as the
     default because it has no gain or settling time to choose. To hold ``k`` instead, force with a
     [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) whose target is
-    left out: it takes the target from the state and restores ``k`` exponentially, its gain setting
+    left out: it takes the target from the stationary state and restores ``k`` exponentially, its gain setting
     the fluctuation it leaves.
 
 !!! warning "The prediction rests on placeholder values"
     ``\\tilde{k}`` and the band's share of ``k`` are provisional, the same for every forcing strategy,
     and not yet dependent on the Reynolds number; the values per band are listed at
     `kinetic_energy_in_box_units`. A forcing that holds ``k`` or ``\\varepsilon`` exactly meets that
-    member; the rest of the state, and a filled strength, are as good as the model.
+    member; the rest of the stationary state, and a filled strength, are as good as the model.
 
 # Fields
-Three of these are what a user reads — `state`, `cache`, and `tracers`. The rest are the machinery the step runs
-on: they hold partial values while a step is in flight, so read them only between steps, and treat
-their contents as the scheme's business rather than the run's state.
+Three of these are what a user reads — `state`, `cache`, and `tracers`. The rest are the run's
+settings — the domain, the schemes, `cfl`, `max_dt`, the clock — and the working storage the step
+runs on, which holds partial values while a step is in flight and is read only between steps.
 
 - `state` — the `ResolvedFields` (the evolving ``\\hat{\\boldsymbol{u}}``, ``\\hat\\varphi``).
 - `cache` — the `ObservablesCache`: the observables the iteration deposits at its end.
@@ -527,8 +530,8 @@ _seeded(d::DeferredForcing{StochasticOU}, rng) =
     DeferredForcing{StochasticOU}(merge(d.parameters, (; seed = rand(rng, Int)))) : d
 
 
-# The member of the run's state the velocity forcing holds exactly — whether it states it or takes it
-# from the state: `:dissipation`, `:kinetic_energy`, or `nothing`.
+# The member of the stationary state the velocity forcing holds exactly — whether it is given it or
+# takes it from that state: `:dissipation`, `:kinetic_energy`, or `nothing`.
 _held_quantity(spec) = let stated = _stated_state(spec)
   stated !== nothing ? only(keys(stated)) :
   spec isa DeferredForcing{ConstantPower} && _takes_design(spec) ? :dissipation :
@@ -594,7 +597,8 @@ the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3
 
 Returns a named tuple `(; kinetic_energy, dissipation, band_kinetic_energy, viscosity, reynolds_box,
 reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` in the domain's element type. A forcing the prediction does not
-cover (an unforced run, a band that does not start at shell 1) has no stationary state to predict,
+cover (an unforced run, a forcing that forces no band of shells, a band that does not start at
+shell 1 or ends at shell 1) has no stationary state to predict,
 and it throws an `ArgumentError`, as does a stationary state given twice or both `κ_max_η` and `viscosity`.
 
 !!! warning "A prediction, not a measurement"
@@ -720,14 +724,14 @@ end
 # `_design_state`); one that holds neither — a band, a fixed rate, a stated stochastic strength —
 # leaves ν calibrated against a state the run may not reach, and this names it at construction.
 _warn_derived_viscosity_forcing_mismatch(vf::VarianceRescaling, design) =
-  (@warn "Simulation (derived viscosity): ν was calibrated for the whole-field state " *
+  (@warn "Simulation (derived viscosity): ν was calibrated for the whole-field stationary state " *
          "(k ≈ $(round(design.kinetic_energy, sigdigits = 4)), ε ≈ $(round(design.dissipation, sigdigits = 4))), " *
          "but this `VarianceRescaling(over = :band)` holds only the band and lets both settle " *
          "elsewhere. Use `over = :total`, or set `viscosity` yourself.";
    nothing)
 
 _warn_derived_viscosity_forcing_mismatch(vf::AbstractForcing, design) =
-  (@warn "Simulation (derived viscosity): ν was calibrated for the state (k ≈ " *
+  (@warn "Simulation (derived viscosity): ν was calibrated for the stationary state (k ≈ " *
          "$(round(design.kinetic_energy, sigdigits = 4)), ε ≈ $(round(design.dissipation, sigdigits = 4))), " *
          "which a $(nameof(typeof(vf))) given its own strength does not hold (k and ε settle " *
          "wherever its balance puts them). The κ_max·η / Re_λ the constructor reports are then " *
@@ -1101,20 +1105,22 @@ end
 """
     advance!(sim; dt = nothing)
 
-Advance `sim` by one timestep in place and return it.
+Advance `sim` by one iteration in place: the timestep choice, the step, the closing
+[`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) that makes the cache readable, the
+tracer advance under the run's particle integration scheme — after rebuilding the
+[`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) from the
+start-of-step positions under `traversal_mode = :automatic` — closed by its own deposit, and the
+clock's advance.
 
 # Arguments
 - `sim` — the [`Simulation`](@ref) to advance.
 - `dt = nothing` — pass a value to force a fixed step; `nothing` picks the adaptive step, the
   smallest of the advective-CFL value for the current velocity, the longest mode's diffusive-decay
-  time (the same diffusive-decay bound the `Simulation` docstring states), and `max_dt`.
+  time (the bound the `Simulation` docstring states), and `max_dt`. A step that is not positive,
+  given or adaptive under a non-positive `cfl`, is an `ArgumentError`.
 
-Each call closes the iteration with [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), so
-the cache is readable when it returns. It advects the tracers, if any, under the run's chosen particle
-integration scheme — first rebuilding the run's
-[`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) from the
-start-of-step positions when the run was built with `traversal_mode = :automatic` (the default
-with tracers) — and updates the clock.
+A velocity or scalar the step has made non-finite is an error naming the step, raised after the
+closing deposit, so a blown-up run never reports success.
 
 Returns `sim`.
 """
@@ -1340,7 +1346,7 @@ second form passes the callback as a
 [`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
 
 After a `true`, the next iteration runs: the timestep from the cached maximum speed, the step, the
-tracer advance, and the closing deposits. A run of ``n`` iterations therefore calls the callback
+closing deposit, and the tracer advance closed by its own deposit. A run of ``n`` iterations therefore calls the callback
 ``n + 1`` times, and the last call reads the final state before the stop.
 
 Stopping is the callback's decision on observables, never a run option. A span of simulation
@@ -1490,11 +1496,13 @@ seeded forced run. A freely decaying run (`NoForcing()`) has no stationary state
 ``\\varepsilon`` never plateaus — so the criterion can only run to `max_turnovers` and warn; give a
 decaying run a fixed-length loop instead, which is a three-line callback (see `run!`).
 
-At each iteration it measures the dissipation ``\\varepsilon`` and the kinetic energy ``k``, accumulates
-the eddy-turnover clock ``\\Delta t \\varepsilon/k`` over the timestep ``\\Delta t``, and tests ``\\varepsilon`` for flatness over a
-trailing window; it stops the run when every gate holds, or gives up with a warning at
-`max_turnovers`. The gate reads ``\\varepsilon`` alone: the small scales settle last, so a flat
-``\\varepsilon`` is the strict indicator. A rescale or a controller holds ``k``, whose flatness would
+At each iteration it measures the dissipation ``\\varepsilon`` and the kinetic energy ``k`` and
+accumulates the eddy-turnover clock ``\\Delta t \\varepsilon/k`` over the timestep ``\\Delta t``. Once
+per sample — one per `window_turnovers / 40` of turnover time, about forty across the trailing
+window — it banks its signals and tests ``\\varepsilon`` for flatness over that window; it stops the run when
+every gate holds, or gives up with a warning at `max_turnovers`. The velocity gate reads
+``\\varepsilon``, not ``k``: the small scales settle last, so a flat ``\\varepsilon`` is the strict
+indicator. A rescale or a controller holds ``k``, whose flatness would
 then certify the forcing; under fixed injection ``k`` overshoots, then wanders slowly, and a drift
 test passes only by chance.
 
@@ -1512,9 +1520,7 @@ test passes only by chance.
   default — the skewness is the only measurement here that transforms a rank-2 field, nine
   component transforms and a per-call tensor allocation larger than the resident working set (see
   [`derivative_skewness`](@ref GBGHomogeneousTurbulence.Observables.derivative_skewness)). When it
-  is on, the skewness is measured on the criterion's own sampling interval — one
-  sample per `window_turnovers / 40` of turnover time, giving about forty samples across the
-  trailing window — rather than every iteration.
+  is on, the skewness is measured once per sample, not every iteration.
 - `min_turnovers`, `window_turnovers`, `tolerance` — do not test before `min_turnovers` eddy-turnover
   times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
   trailing `window_turnovers`, relative drift below `tolerance`.
@@ -1659,11 +1665,12 @@ export write_simulation, read_simulation
 
 Checkpoint the run: write everything needed to restore `sim` (a [`Simulation`](@ref)) as one
 self-describing HDF5 group — the domain's parameters, the state in spectral representation, the
-tracer set, both forcing strategies, the Lagrangian sample history a multistep particle
-integration scheme integrates over, the scheme and timestep settings, and the clock. Nothing
-derivable is stored: the physical-representation observables, the current velocity sample, and
-every per-step buffer and transform plan are recomputed on read. A stochastic forcing's evolving
-state is part of the run's state and is stored with it, so continuation is exact for every forcing.
+tracer set, both forcing strategies, the viscosity and the Schmidt number, the Lagrangian sample
+history a multistep particle integration scheme integrates over, the scheme and timestep settings,
+and the clock. Nothing derivable is stored: the physical-representation observables, the current
+velocity sample, and every per-step buffer and transform plan are recomputed on read. A stochastic
+forcing's evolving state is part of the run's state and is stored with it, so continuation is exact
+for every forcing.
 
 Available once the `HDF5` package is loaded; opening and closing the file is the caller's job,
 and `parent[name] = sim` is equivalent sugar.

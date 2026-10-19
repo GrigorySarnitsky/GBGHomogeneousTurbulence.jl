@@ -214,7 +214,7 @@ is modelled; anything else it carries. Otherwise the keywords and defaults are t
 sim = Simulation(grid_points_per_axis = 64, kinetic_energy = 1.5,
                  velocity_forcing = ConstantPower())
 
-# Or state it, and the forcing's target is the run's state:
+# Or give it, and the forcing's target is the run's stationary state:
 sim = Simulation(grid_points_per_axis = 64,
                  velocity_forcing = ConstantPower(injection_rate = 0.4))
 
@@ -766,7 +766,7 @@ in the band if the run depends on the controller taking hold.
   dynamics least. `0` is the bare marginal law above.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/(3\\varepsilon_\\infty)``
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``).
-  Left at `nothing` it is computed for you from that formula. A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) uses the state it
+  Left at `nothing` it is computed for you from that formula. A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) uses the stationary state it
   predicts; built on a domain, the controller takes
   ``\\varepsilon_\\infty = (k_\\infty/\\tilde{k})^{3/2}/L`` with ``\\tilde{k}`` its band's placeholder kinetic
   energy in box units
@@ -849,7 +849,7 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                         "`gain = 0` is the bare marginal law — no restoring at all — and is allowed."))
   band = _shell_band(domain, lowest_shell, highest_shell)
   # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ = (k_∞/k̃)^{3/2}/L from the model's k̃ for
-  # this band. A `Simulation` passes the turnover time of the state it predicts instead; this default
+  # this band. A `Simulation` passes the turnover time of the stationary state it predicts instead; this default
   # serves a controller built on a domain by hand, and holds only while the placeholder k̃ is flat in
   # the Reynolds number, which such a controller does not know.
   if turnover_time === nothing
@@ -1482,7 +1482,7 @@ _stated_state(d::DeferredForcing{VarianceRescaling}) =
   d.parameters.over === :total && d.parameters.target !== nothing ?
     (kinetic_energy = d.parameters.target,) : nothing
 
-# Whether a forcing takes its strength from the run's state — true only for a deferred forcing
+# Whether a forcing takes its strength from the run's stationary state — true only for a deferred forcing
 # whose target was left out. Such a forcing is consistent with the derived viscosity by construction.
 _takes_design(::Any) = false
 _takes_design(d::DeferredForcing{ConstantPower}) = d.parameters.injection_rate === nothing

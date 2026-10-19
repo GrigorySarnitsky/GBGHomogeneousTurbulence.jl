@@ -21,7 +21,7 @@ ParticleTracking
 
 ## The predicted stationary state
 
-This section predicts the state a forced run is set up for — ``k``, ``\varepsilon``, the band's
+This section predicts the stationary state a forced run is set up for — ``k``, ``\varepsilon``, the band's
 energy, ``\nu`` and the two Reynolds numbers — before the run is built, as [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) predicts it.
 
 ```@docs

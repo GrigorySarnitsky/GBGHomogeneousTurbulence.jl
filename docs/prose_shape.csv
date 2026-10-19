@@ -281,17 +281,17 @@ unit,words,longest_paragraph,admonitions
 "SimulationRun.jl :: Simulation(; grid_points_per_axis, κ_max_η = nothing, kineti",2832,1432,3
 "SimulationRun.jl :: SimulationRun",259,224,0
 "SimulationRun.jl :: StationarityCriterion(; gate_scalar = true, gate_skewness = ",631,295,0
-"SimulationRun.jl :: advance!(sim; dt = nothing)",120,56,0
+"SimulationRun.jl :: advance!(sim; dt = nothing)",145,62,0
 "SimulationRun.jl :: current_step(sim)",104,90,0
 "SimulationRun.jl :: current_time(sim)",7,6,0
 "SimulationRun.jl :: every_steps(n)",106,52,0
 "SimulationRun.jl :: every_time(period)",194,75,0
 "SimulationRun.jl :: flow_parameters(sim)",93,92,0
-"SimulationRun.jl :: predicted_stationary_state(domain; velocity_forcing = Consta",344,112,1
+"SimulationRun.jl :: predicted_stationary_state(domain; velocity_forcing = Consta",355,112,1
 "SimulationRun.jl :: read_simulation(parent::HDF5.H5DataStore, name::AbstractStri",204,99,0
-"SimulationRun.jl :: run!(callback, sim; dt = nothing)",307,77,0
+"SimulationRun.jl :: run!(callback, sim; dt = nothing)",312,77,0
 "SimulationRun.jl :: warmup!(sim; dt = nothing, kwargs...)",150,55,0
-"SimulationRun.jl :: write_simulation(parent::HDF5.H5DataStore, name::AbstractStr",149,94,0
+"SimulationRun.jl :: write_simulation(parent::HDF5.H5DataStore, name::AbstractStr",155,100,0
 "SimulationRun.md § Advancing the run",27,27,0
 "SimulationRun.md § Cadence predicates",38,38,0
 "SimulationRun.md § Clock accessors",11,11,0
