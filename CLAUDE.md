@@ -195,8 +195,8 @@ sentence would sit equally well in the *target's* own docstring, cut it and link
 **Template conventions.**
 
 - An admonition title is plain text — Documenter renders neither code spans nor math there.
-- The `# Arguments` list is led by "The arguments are:". A lead-in qualifier ("All keyword, all
-  required:") appears only where it carries information beyond the entries themselves.
+- The `# Arguments` list is led by "The arguments are:". A lead-in qualifier ("Every argument is a
+  keyword, and every one is required:") appears only where it carries information beyond the entries themselves.
 - An `# Examples` section appears where construction is non-obvious, not on every type — hence
   none on the types a run builds for the user, and one on `FixedDomain`, `Simulation`, `Tracers`,
   `FlowParameters`.

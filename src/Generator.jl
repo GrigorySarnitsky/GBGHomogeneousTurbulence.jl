@@ -54,7 +54,7 @@ These are what a run is configured with; what the flow turns out to have is meas
 [`Observables`](@ref GBGHomogeneousTurbulence.Observables).
 
 # Arguments
-All keyword, all required:
+Every argument is a keyword, and every one is required:
 - `viscosity` — the kinematic viscosity ``\\nu``.
 - `schmidt` — the Schmidt number ``\\mathrm{Sc}``.
 - `velocity_forcing`, `scalar_forcing` — the forcing strategies for the velocity and the scalar, each

@@ -348,9 +348,10 @@ so, holds ``\\varepsilon``. The viscosity is derived from the grid, or supplied:
 
 # Arguments
 
-All keyword except `domain`. The keywords split as the forms do: the *domain group* is
-consumed by the domain-building form, and the domain-taking form replaces the whole group with its
-one positional argument; the *run group* is accepted by both.
+Every argument is a keyword except `domain`, the one positional argument of the domain-taking
+form. The keywords split as the forms do: the *domain group* is consumed by the domain-building
+form, and the domain-taking form replaces the whole group with `domain`; the *run group* is accepted
+by both.
 
 The domain group:
 

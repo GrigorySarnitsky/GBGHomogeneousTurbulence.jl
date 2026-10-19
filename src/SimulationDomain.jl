@@ -204,7 +204,7 @@ The discretized periodic box a run lives on — the reusable, read-only frame: a
 pseudospectral method needs on that box.
 
 # Arguments
-All keyword; the five naming the box are required:
+Every argument is a keyword; the five naming the box are required:
 - `grid_points_per_axis` — grid points ``N`` along each axis (the box is ``N^{3}``).
 - `side_length` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
 - `dealiasing` — the dealiasing strategy: [`TwoThirds`](@ref) (the sharp ``2/3`` rule) and [`HouLi`](@ref)
