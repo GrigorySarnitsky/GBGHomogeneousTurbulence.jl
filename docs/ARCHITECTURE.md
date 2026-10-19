@@ -65,8 +65,9 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  velocity_forcing = ConstantPower(injection_rate = 0.1),
                  scalar = PassiveScalar(schmidt = 1.0))
 
-# Spin past the transient: advance until the running dissipation ε(t) stops drifting
-# (k(t) is deliberately not used — under a fixed-injection forcing like this it overshoots, then wanders).
+# Spin past the transient: advance until the running dissipation ε(t) stops
+# drifting. The kinetic energy k(t) is not the test: under a fixed-injection
+# forcing like this one it overshoots, then wanders.
 warmup!(sim)
 
 # Advance until the stopping criterion returns false. It is called once at the

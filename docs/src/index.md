@@ -42,28 +42,35 @@ using GBGHomogeneousTurbulence
 
 ## Quick start
 
-Build a case with the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor, which builds every component for
-you — spin it up to stationarity, and advance it:
+Build a case with the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor, spin it up to stationarity, and
+advance it with [`run!`](@ref GBGHomogeneousTurbulence.SimulationRun.run!) and a
+[`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments):
 
 ```julia
 using GBGHomogeneousTurbulence
 
 sim = Simulation(grid_points_per_axis = 64)
-# A 64³ forced-stationary run; the viscosity ν is set so the grid captures the dissipation scale.
+# A forced run on a 64³ grid. The viscosity ν is chosen so that the grid
+# resolves the dissipation scale.
 
 warmup!(sim)
-# Spin up to statistical stationarity. The default forcing, ConstantPower, holds the energy injection
-# rate the run was set up for, so the kinetic energy k settles freely — read its docstring before measuring k.
+# Run until the flow is statistically stationary. The default forcing,
+# ConstantPower, holds the energy injection rate fixed, so the kinetic
+# energy k settles freely; read its docstring before measuring k.
 
 t_end = current_time(sim) + 5.0
-run!(sim) do s              # the stopping criterion reads the run, records
-    current_time(s) < t_end # what it wants, and decides continuation
+# Advance by 5 units of simulation time. The function given to run! is
+# the stopping criterion: run! calls it at the start and after every
+# iteration, and stops the run when it returns false.
+run!(sim) do s
+    current_time(s) < t_end
 end
 
-# The state is always current. The observables cache serves what the last iteration (one advance of
-# the run) stored at its end; a read made stale by a later change to the state throws instead.
-kinetic_energy(sim.state.velocity_spectral)  # a measured observable, read off the state
-velocity_physical(sim.cache)                 # the field the last iteration stored
+# The state is always current. The observables cache holds what the last
+# iteration (one advance of the run) stored at its end; reading a value
+# after a later change to the state throws an error.
+kinetic_energy(sim.state.velocity_spectral)  # computed from the state
+velocity_physical(sim.cache)                 # stored by the last iteration
 ```
 
 ## What it solves

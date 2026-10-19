@@ -89,12 +89,13 @@ and the run carries a tracer set: [`advance!`](@ref GBGHomogeneousTurbulence.Sim
 sample, so the reads below are always current between iterations.
 
 ```julia
-sim = Simulation(grid_points_per_axis = 64, particles = ParticleTracking(number_of_particles = 4096))
+sim = Simulation(grid_points_per_axis = 64,
+                 particles = ParticleTracking(number_of_particles = 4096))
 warmup!(sim)
 advance!(sim)
 
 point_positions(sim.tracers.positions)     # (M, 3) positions, via GBGPeriodicFields
-velocity_at_particles(sim.cache)  # u(tₙ, X(tₙ)) — the Lagrangian sample; throws if stale
+velocity_at_particles(sim.cache)  # the sample u(tₙ, X(tₙ)); throws if stale
 out = new_vector_point_values(sim.tracers)   # allocate once, then reuse
 interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)
 ```

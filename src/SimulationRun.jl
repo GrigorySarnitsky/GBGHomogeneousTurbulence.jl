@@ -446,11 +446,13 @@ sim = Simulation(grid_points_per_axis = 128, velocity_forcing = VarianceControll
 
 # Supplied viscosity — set ν directly, carry a passive scalar, force at constant power:
 sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
-                 scalar = PassiveScalar(), velocity_forcing = ConstantPower(injection_rate = 0.1))
+                 scalar = PassiveScalar(),
+                 velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Domain-taking — build the domain yourself, then hand it over:
 domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
-                       dealiasing = HouLi(), element_type = Float64, array_family = Array)
+                       dealiasing = HouLi(), element_type = Float64,
+                       array_family = Array)
 sim = Simulation(domain; viscosity = 1e-2)
 ```
 
