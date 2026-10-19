@@ -22,22 +22,21 @@ The run layer:
 - [`Simulation`](@ref) — everything the next iteration needs, in one value: the domain, the
   fields at the current instant, the observables cache, the equations of motion with their
   forcing, the integration schemes with their scratch, any tracers, and the clock — built with
-  defaults from a few numbers. It holds the present instant — plus the one bounded look-back a
-  multistep particle scheme needs, the cache's Lagrangian sample history of earlier tracer
-  velocities — and past instants exist only in what an observation recorded.
+  defaults from a few numbers. It holds the present instant, and its cache also keeps the earlier
+  tracer velocities a multistep particle scheme needs. An earlier state survives only where the
+  caller records it between iterations.
 - [`PassiveScalar`](@ref) — the passive scalar a run carries, with its Schmidt number, variance
   and forcing, as `Simulation`'s `scalar` setting.
 - [`ParticleTracking`](@ref) — the Lagrangian tracking a run carries: the tracer set, seeded or
   adopted, its integration scheme and its traversal mode, as `Simulation`'s `particles` setting.
 - [`predicted_stationary_state`](@ref) — the stationary state a forced run is set up for.
-- [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
-  callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
-  iteration — and its return decides continuation).
-- [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged spin-up-to-stationarity
-  observation, and its one-line shorthand.
+- [`advance!`](@ref), [`run!`](@ref) — advance one iteration; advance until a *stopping criterion*,
+  a function of the run called at the start and after every iteration, returns `false`.
+- [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged stopping criterion, which ends a
+  spin-up once the flow is statistically stationary, and its one-line shorthand.
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count;
-  [`every_steps`](@ref), [`every_time`](@ref) — the cadence predicates a callback acts
-  periodically on.
+  [`every_steps`](@ref), [`every_time`](@ref) — tests for acting every so many steps or every
+  interval of simulation time.
 - [`write_simulation`](@ref) / [`read_simulation`](@ref) — checkpoint and restore: the restartable
   run as one self-describing HDF5 group (available once `HDF5` is loaded).
 
