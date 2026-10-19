@@ -307,8 +307,11 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   # and the strain tensor (9) share this object. Built from the array family and the grid alone
   # (PF decision 93): the planner plans on one-component arrays of its own, so a timed planner
   # (`MEASURE`) clobbers nothing of the run's, and no template field is built here for it.
-  transform_plans = FieldTransformPlans(array_family, grid; layout,
-                                        fft_flags, fft_timelimit = Float64(fft_timelimit))
+  # `nothing` leaves the planner flag to the field library's own default (FFTW's ESTIMATE), which
+  # takes a flag value, never `nothing` (PF decision 103).
+  planner_flag = fft_flags === nothing ? (;) : (; fft_flags)
+  transform_plans = FieldTransformPlans(array_family, grid; layout, planner_flag...,
+                                        fft_timelimit = Float64(fft_timelimit))
   # The multipliers from the array family and the grid alone (PF decision 94): no template field.
   multipliers = FieldSpectralMultipliers(array_family, grid; layout)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it

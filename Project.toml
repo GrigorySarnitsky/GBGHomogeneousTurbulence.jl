@@ -15,7 +15,7 @@ HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 GBGHomogeneousTurbulenceHDF5Ext = "HDF5"
 
 [sources]
-GBGPeriodicFields = {rev = "e57f78aac4ce61cae7b0e38d38ac0ff2b31eac67", url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"}
+GBGPeriodicFields = {rev = "9de90ef45def038d35277b2e804287e37df840ce", url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"}
 
 [compat]
 GBGPeriodicFields = "0.1.0"
