@@ -1,0 +1,2 @@
+# The validation folder holds the TurTLE comparison scripts; GitHub leaves it out of the language count.
+validation/** linguist-detectable=false

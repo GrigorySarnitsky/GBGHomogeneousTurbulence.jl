@@ -13,6 +13,8 @@ Config(
                reason = "the TurTLE reproduction scripts the Validation page points at, so a reader of the published comparison can rerun it from the repository (the owner, 2026-10-05 and 2026-10-08)"),
         Switch(target = Symbol("RULE.GIT.TRACKED"), files = ["parked/**"],
                reason = "the parked reference-law module Phenomenology — its source, tests and pages kept whole, loaded and built by nothing, in the layout of the standalone package it becomes when extracted (the owner, 2026-10-16, decision 113)"),
+        Switch(target = Symbol("RULE.GIT.TRACKED"), files = [".gitattributes"],
+               reason = "leaves the validation folder out of GitHub's language count (the owner, 2026-10-20)"),
     ],
     generated = ["docs/src/architecture.md", "docs/src/decisions.md", "docs/src/gbg.md"],
     disciplines = [:turbulence_theory, :spectral_numerics, :software_architecture],
