@@ -7,6 +7,7 @@ here is read as the entry states it.
 - `RULE.GIT.TRACKED` — the TurTLE reproduction scripts the Validation page points at, so a reader of the published comparison can rerun it from the repository (the owner, 2026-10-05 and 2026-10-08) (`validation/**`)
 - `RULE.GIT.TRACKED` — the parked reference-law module Phenomenology — its source, tests and pages kept whole, loaded and built by nothing, in the layout of the standalone package it becomes when extracted (the owner, 2026-10-16, decision 113) (`parked/**`)
 - `RULE.GIT.TRACKED` — leaves the validation folder out of GitHub's language count (the owner, 2026-10-20) (`.gitattributes`)
+- `RULE.DOC.JULIA_MANUAL` — the owner's own worked example, which uses `do` blocks without the manual link (the owner, 2026-10-20) (`docs/src/examples/two_peak_scalar_mixing.md`)
 
 Rules this package adds for itself, which are nobody else's:
 
