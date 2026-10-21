@@ -17,6 +17,8 @@ Config(
                reason = "leaves the validation folder out of GitHub's language count (the owner, 2026-10-20)"),
         Switch(target = Symbol("RULE.DOC.JULIA_MANUAL"), files = ["docs/src/examples/two_peak_scalar_mixing.md"],
                reason = "the owner's own worked example, which uses `do` blocks without the manual link (the owner, 2026-10-20)"),
+        Switch(target = Symbol("RULE.TEX.SPACING"), files = ["docs/src/examples/two_peak_scalar_mixing.md"],
+               reason = "the owner's own worked example, whose plot title is a LaTeX string in Julia code that the page never renders as mathematics (the owner, 2026-10-21)"),
     ],
     generated = ["docs/src/architecture.md", "docs/src/decisions.md", "docs/src/gbg.md"],
     disciplines = [:turbulence_theory, :spectral_numerics, :software_architecture],
