@@ -38,6 +38,8 @@ jobs:
         run: |
           julia --color=yes --project=docs -e '
             using Pkg;
+            Pkg.Registry.add("General");
+            Pkg.Registry.add(url = "https://github.com/GrigorySarnitsky/GBGRegistry");
             Pkg.instantiate();
           '
 
