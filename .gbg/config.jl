@@ -8,6 +8,7 @@ Config(
     tool = v"2.4.0",
     docs_build = ["julia", "--project=docs", "docs/make.jl"],
     test = ["julia", "--project", "-e", "using Pkg; Pkg.test()"],
+    leak_emails = ["grigory@sarnitsky.se"],
     switches = [
         Switch(target = Symbol("RULE.GIT.TRACKED"), files = ["validation/**"],
                reason = "the TurTLE reproduction scripts the Validation page points at, so a reader of the published comparison can rerun it from the repository (the owner, 2026-10-05 and 2026-10-08)"),
