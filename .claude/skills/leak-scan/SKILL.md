@@ -1,4 +1,4 @@
-<!-- gbg:managed begin v2.4.0 — rewritten by `gbg sync`; do not edit -->
+<!-- gbg:managed begin v2.5.0 — rewritten by `gbg sync`; do not edit -->
 # /leak-scan
 
 Nothing secret or personal is published when a repository is made public; it records only accepted fingerprints.
@@ -23,7 +23,12 @@ decides, since it says what publishing would cost — and not otherwise; it ends
      every blocking file and every session link, and publish the rewritten history as a NEW public
      repository, keeping this one private as the archive; the commit map `git filter-repo` writes
      lets every commit hash the package's documents cite be updated mechanically. The alternative,
-     a new repository started from today's tree, loses the public history.
+     a new repository started from today's tree, loses the public history. A credential finding
+     that only the history holds and that is plainly no credential (Gitleaks matched a key-like
+     name beside a value that merely looks random) you show the owner by file and line, never by
+     the text; on his answer for that one finding, `gbg leak --github --not-credential
+     <fingerprint> --why "<his reason>"` records it in `.gbg/leak-accepted.txt`, which you commit.
+     It refuses a finding the current files still hold, under any name.
    - **In the current files**, and on the GitHub side, which turns public with the repository. Cleaned.
      A path, an address or a session link is no secret: open today's file, find it, and fix it — in a
      document a documentation fix; in code it waits for the owner's answer like any code change; on
@@ -59,7 +64,8 @@ hook refuses a push that would publish one.
 ## What it may not do
 
 - It writes no tracked file but `.gbg/leak-accepted.txt`, and that only on `--accept`, which records
-  fingerprints alone: every writer of a record refuses text a leak scan printed.
+  fingerprints alone, or on `--not-credential`, which records one fingerprint with the owner's
+  reason: every writer of a record refuses text a leak scan printed.
 - It never removes a leak, from a file or from the history, on its own: a rewrite is made on the
   owner's answer, and a credential found is revoked, not only removed.
 - It never switches a `RULE.LEAK.*` rule off, nor approves an address in `leak_emails`: the owner does.

@@ -1,4 +1,4 @@
-<!-- gbg:managed begin v2.4.0 — rewritten by `gbg sync`; do not edit -->
+<!-- gbg:managed begin v2.5.0 — rewritten by `gbg sync`; do not edit -->
 # What GBGHomogeneousTurbulence has switched off
 
 Each entry names a rule this package does not hold itself to, and why. A rule listed

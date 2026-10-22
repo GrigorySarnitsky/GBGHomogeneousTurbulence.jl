@@ -1,4 +1,4 @@
-<!-- gbg:managed begin v2.4.0 — rewritten by `gbg sync`; do not edit -->
+<!-- gbg:managed begin v2.5.0 — rewritten by `gbg sync`; do not edit -->
 # Testing protocol — `RULE.TEST.*`
 
 What a test is for, where its oracle comes from, and when a thing is done. 12 rules, written from the rule values themselves,

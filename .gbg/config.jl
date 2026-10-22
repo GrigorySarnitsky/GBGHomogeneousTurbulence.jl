@@ -5,7 +5,7 @@
 # default is wrong for this package.
 Config(
     package = "GBGHomogeneousTurbulence",
-    tool = v"2.4.0",
+    tool = v"2.5.0",
     docs_build = ["julia", "--project=docs", "docs/make.jl"],
     test = ["julia", "--project", "-e", "using Pkg; Pkg.test()"],
     leak_emails = ["grigory@sarnitsky.se"],
