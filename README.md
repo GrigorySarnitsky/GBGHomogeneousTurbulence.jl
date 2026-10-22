@@ -18,24 +18,24 @@ development took place.
 
 ## Installation
 
-This is a private, unregistered package. To install it (you need access to the repository):
-
-```julia
-]add https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl
-]add https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl
-```
-
-(the field-library backend first — both are unregistered, so Julia cannot resolve
-`GBGPeriodicFields` on its own — and Julia ≥ 1.12)
-
-or
+Install it by name from the GBG packages' own registry,
+[GBGRegistry](https://github.com/GrigorySarnitsky/GBGRegistry), added after `General`:
 
 ```julia
 using Pkg
-
-Pkg.add(url="https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl")
-Pkg.add(url="https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl")
+Pkg.Registry.add("General")
+Pkg.Registry.add(url = "https://github.com/GrigorySarnitsky/GBGRegistry")
+Pkg.add("GBGHomogeneousTurbulence")
 ```
+
+or at the package prompt:
+
+```
+pkg> registry add General https://github.com/GrigorySarnitsky/GBGRegistry
+pkg> add GBGHomogeneousTurbulence
+```
+
+GBGPeriodicFields comes with it. Julia 1.12 or later is required.
 
 Then:
 
