@@ -212,3 +212,6 @@ fbe2ef7dd44d0e7b
 fed920ca08610d99
 fee7ffbce4a84485
 ff8dc0f529cffead
+8a55639c003ec70f  not a credential: the panel hat name api-user in a list of hat names, no key
+63586d4cf1a29c48  not a credential: the panel hat name api-user in a list of hat names, no key
+9600b5932c1a725e  not a credential: the panel hat name api-user in a list of hat names, no key
