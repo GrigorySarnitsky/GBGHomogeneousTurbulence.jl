@@ -1,8 +1,11 @@
 # Witness for candidate test-critic-05: "IFHeun's step! allocation-free guarantee is never measured
 # with @allocated". The claim is a coverage claim; the behaviour it worries about is that IFHeun's
 # stage-2 predictor path allocates. This asserts the CORRECT behaviour: one warmed IFHeun step! plus
-# its closing deposit! allocate less than a single field's worth of bytes, on both the velocity-only
-# and the velocity+scalar path (the scalar branch carries the extra predictor/stage registers).
+# its closing deposit! allocate nothing that grows with the field, on both the velocity-only and the
+# velocity+scalar path (the scalar branch carries the extra predictor/stage registers). Measured as
+# the growth from 32³ to 48³, held under the growth of one field: with several Julia threads, FFTW.jl
+# spawns a task per thread on every transform, ~1.9 kB a call whatever the grid, which a fixed
+# one-field ceiling at a small grid cannot tell from a field-scale allocation (2026-10-23).
 
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
@@ -10,7 +13,7 @@ using Random
 using Test
 
 
-function step_deposit_bytes(; scalar::Bool, N = 16, T = Float64)
+function step_deposit_bytes(; scalar::Bool, N, T = Float64)
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
                        dealiasing = TwoThirds(), array_family = Array)
@@ -50,14 +53,12 @@ end
 
 
 @testset "IFHeun's step! (and its closing deposit!) is allocation-free over the preallocated buffers" begin
-  @testset "velocity only" begin
-    bytes, field_bytes = step_deposit_bytes(scalar = false)
-    @info "IFHeun velocity-only" bytes field_bytes
-    @test bytes < field_bytes
-  end
-  @testset "velocity + passive scalar" begin
-    bytes, field_bytes = step_deposit_bytes(scalar = true)
-    @info "IFHeun velocity+scalar" bytes field_bytes
-    @test bytes < field_bytes
+  for (label, scalar) in (("velocity only", false), ("velocity + passive scalar", true))
+    @testset "$label" begin
+      small_bytes, small_field = step_deposit_bytes(; scalar, N = 32)
+      large_bytes, large_field = step_deposit_bytes(; scalar, N = 48)
+      @info "IFHeun $label" small_bytes large_bytes growth = large_bytes - small_bytes field_growth = large_field - small_field
+      @test large_bytes - small_bytes < large_field - small_field
+    end
   end
 end
