@@ -1,6 +1,6 @@
 name = "GBGHomogeneousTurbulence"
 uuid = "3aaacc91-4a61-401b-8a51-8cd29bd9b474"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Grigory Sarnitsky <grigory@sarnitsky.se>"]
 
 [deps]

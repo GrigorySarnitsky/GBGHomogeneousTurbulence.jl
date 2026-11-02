@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 2026-11-02
+
+The two-peak scalar mixing example now includes a 512³ run and its video, GH200 Grace Hopper
+timings for the 192³ runs, and the call that releases GPU memory under CUDA. The package itself is
+unchanged.
+
 ## 0.1.0 — 2026-10-22
 
 The first release: a pseudospectral direct numerical simulation of homogeneous isotropic turbulence
