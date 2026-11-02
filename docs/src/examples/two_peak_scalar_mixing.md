@@ -22,7 +22,7 @@ The resolution is set by `κ_max_η = 1.5`, the product ``\kappa_{\max}\eta`` of
 
 The run is advanced for twenty large-eddy times ``k/\varepsilon`` and written to an HDF5 file; the scalar runs below start from that file.
 
-The code is written for ROCm. To use CUDA, load `CUDA` instead of `AMDGPU` and pass `array_family = CuArray`. The run takes about 12 minutes on a Radeon RX 7900 XTX and 9 minutes on a GeForce RTX 5070 Ti.
+The code is written for ROCm. To use CUDA, load `CUDA` instead of `AMDGPU`, pass `array_family = CuArray` and use `CUDA.reclaim()`. The run takes about 12 minutes on a Radeon RX 7900 XTX, 9 minutes on a GeForce RTX 5070 Ti and 5 minutes on a GH200 Grace Hopper.
 
 ```julia
 using AMDGPU
@@ -65,7 +65,7 @@ AMDGPU.reclaim()
 
 Next we release the scalar into the stationary flow prepared in the previous step. At the start the scalar fills the two slabs: ``\varphi = 1`` where ``L/4 < x < 3L/4`` and ``\varphi = -1`` elsewhere. Each edge is a ``\tanh`` profile whose length scale is three grid spacings, so that the grid resolves it. The scalar has Schmidt number one and is unforced, so its variance decays. The velocity is still forced at constant power, so the flow stays stationary.
 
-The run lasts three large-eddy times (``3 k / \varepsilon``), and 180 times per ``k/\varepsilon`` it writes two records to an HDF5 file: the values of ``\varphi`` on the plane ``z = 0``, and a histogram of ``\varphi`` over the whole box, built with [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl), from which ``f(\varphi, t)`` is later estimated. The time averages of ``k`` and ``\varepsilon`` and the resulting ``\mathrm{Re}_\lambda`` are stored in the same file. The run takes about 3 minutes on a Radeon RX 7900 XTX and 2 minutes on a GeForce RTX 5070 Ti.
+The run lasts three large-eddy times (``3 k / \varepsilon``), and 180 times per ``k/\varepsilon`` it writes two records to an HDF5 file: the values of ``\varphi`` on the plane ``z = 0``, and a histogram of ``\varphi`` over the whole box, built with [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl), from which ``f(\varphi, t)`` is later estimated. The time averages of ``k`` and ``\varepsilon`` and the resulting ``\mathrm{Re}_\lambda`` are stored in the same file. The run takes about 3 minutes on a Radeon RX 7900 XTX, 2 minutes on a GeForce RTX 5070 Ti and 1.5 minutes on a GH200 Grace Hopper.
 
 ```julia
 using GBGPeriodicFields
@@ -232,3 +232,11 @@ ffmpeg -framerate 30 -i figures/frames/%04d.png -c:v libx264 -pix_fmt yuv420p -c
 ```
 
 ## Mixing on a 512³ grid
+
+Run on a ``512^3`` grid, the simulation reaches ``\mathrm{Re}_\lambda \approx 214`` and ``L/\eta \approx 1019``. With double precision (`element_type = Float64`), a GH200 Grace Hopper takes about 6.5 hours to reach the stationary state and another 1.5 hours to simulate the mixing. The video below shows the result.
+
+```@raw html
+<video controls loop muted playsinline width="100%">
+  <source src="../../assets/mixing_slabs_512.mp4" type="video/mp4">
+</video>
+```
