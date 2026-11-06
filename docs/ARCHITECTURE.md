@@ -3497,7 +3497,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     named for the length ``L``. This is
     the convention of ISO 80000-1, which replaced ISO 31-0. Thirteen symbols were italic across the
     docstrings, the pages and this document; all are now upright. The rulebook does not state the
-    convention yet, and it has been requested of GBGCodingTools; until it lands, nothing checks it.
+    convention yet, and it has been requested of [GBGCodingTools](https://grigorysarnitsky.github.io/GBGCodingTools.jl/); until it lands, nothing checks it.
 
 ## References
 
