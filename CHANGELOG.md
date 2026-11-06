@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-11-07
+
+Three changes break 0.1 code: the seed is set by its spectrum's peak shell, a run is changed by
+building a new `Simulation` that adopts its state, and an adopted state must be the spectrum of a
+real field.
 
 - Breaking: the random seed is set by the shell at which its spectrum peaks, in units of the box's
   fundamental 2π/L. The keyword `envelope_wavenumber` of `Simulation`,
