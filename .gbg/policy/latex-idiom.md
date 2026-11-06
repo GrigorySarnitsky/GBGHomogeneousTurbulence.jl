@@ -1,7 +1,7 @@
-<!-- gbg:managed begin v2.5.0 — rewritten by `gbg sync`; do not edit -->
+<!-- gbg:managed begin v2.7.0 — rewritten by `gbg sync`; do not edit -->
 # LaTeX idiom — `RULE.TEX.*`
 
-What renders, and how mathematics is written so that it renders the same way everywhere. 18 rules, written from the rule values themselves,
+What renders, and how mathematics is written so that it renders the same way everywhere. 19 rules, written from the rule values themselves,
 so a rule reworded here was reworded in the program that checks it.
 
 ### RULE.TEX.BOLDSYMBOL_BRACED
@@ -107,7 +107,7 @@ Covered by a program.
 ### RULE.TEX.RENDERED_MATH
 Mathematics is written in a double-backtick span: never between dollar signs, and never inside a code span.
 
-Dollars render as literal text and a code span renders as monospace; neither comes out as mathematics.
+One spelling of mathematics in every file, the owner's ruling of 2026-10-28: in a docstring a dollar sign interpolates, so mathematics there is written in double backticks, and a page writes it the same way although its dollars would render, so a formula reads, searches and moves between files unchanged. A code span renders as monospace, not as mathematics.
 
 Covered by a program.
 
@@ -131,5 +131,12 @@ Inside a Julia docstring every LaTeX backslash is doubled; a single-backslash es
 Julia consumes the escape when it reads the string, so the formula never reaches the documentation build at all.
 
 Covered by a program.
+
+### RULE.TEX.UPRIGHT_LABEL
+A subscript or superscript that stands for a quantity, a variable or a running index is italic; one that stands for a word, a name or a label is upright: `\kappa_{\mathrm{p}}` for the peak wavenumber, `C_{\mathrm{K}}` for the Kolmogorov constant, `u^{\mathrm{ref}}` for a reference velocity, but `u_i` for a component and `C_p` at constant pressure. Which it is depends on what the letter means where it stands, so one letter may be an italic index in one formula and an upright label in another: `u_i` for a component, `L_{\mathrm{i}}` for ice.
+
+ISO 80000-1, which replaced ISO 31-0, prints a subscript that represents a physical quantity or a mathematical variable, such as a running number, in italic, and every other subscript upright; a superscript follows the same rule. IEC 60050, the IUPAC Green Book and NIST SP 811 (§10.2.1) agree. An italic label misreads: `\kappa_p` reads as κ at an index p, not as the peak wavenumber. `RULE.TEX.IMAGINARY` applies the same principle to the imaginary unit and the differential. A reader decides it, because a letter's meaning is not in the TeX; it is read where the symbol is defined. Asked by GBGHomogeneousTurbulence [ruled 2026-11-06].
+
+Covered by a reader given other documents, because this needs meaning.
 
 <!-- gbg:managed end -->
