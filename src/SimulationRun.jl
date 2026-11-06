@@ -588,16 +588,15 @@ the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3
   neither when the forcing gives it. With none of the three, ``k = 1.5``.
 - `κ_max_η`, `viscosity` — at most one. A resolution ``\\kappa_{\\max}\\eta`` (default 2) fixes the
   Kolmogorov length ``\\eta``, hence ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, and ``\\nu`` follows
-  from ``\\varepsilon`` as ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. A given `viscosity` is kept, and
-  ``\\kappa_{\\max}\\eta`` follows instead.
+  from ``\\varepsilon`` as ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. A given `viscosity` is kept,
+  ``\\varepsilon`` is solved for within six decades of ``k^{3/2}/L``, and ``\\kappa_{\\max}\\eta`` follows.
 
 Returns a named tuple `(; kinetic_energy, dissipation, band_kinetic_energy, viscosity, reynolds_box,
 reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` in the domain's element type. A forcing the prediction does not
 cover (an unforced run, a forcing that forces no band of shells, a band that does not start at
 shell 1 or ends at shell 1) has no stationary state to predict,
-and it throws an `ArgumentError`, as does a stationary state given twice or both `κ_max_η` and `viscosity`.
-With a given `viscosity` and ``k``, ``\\varepsilon`` is solved for within six decades of
-``k^{3/2}/L``, and a ``k`` the model reaches only outside them is refused the same way.
+and it throws an `ArgumentError`, as does a stationary state given twice, both `κ_max_η` and
+`viscosity`, or a ``k`` that no ``\\varepsilon`` in those decades gives.
 
 !!! warning "A prediction, not a measurement"
     The values rest on the model's placeholder ``\\tilde{k}`` and ``k_{\\mathrm{band}}/k``, which are
