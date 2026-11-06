@@ -10,6 +10,14 @@
 - With a given viscosity and kinetic energy, the predicted dissipation rate is no longer limited to
   [1e-30, 1e30] in the user's units, a root outside which was returned as that limit without an
   error. The warm-up's stationarity test no longer calls any series with a mean below 1e-30 flat.
+- Breaking: `fields_modified!`, `particles_modified!`, `restart!` and the `deposit!(sim)` method are
+  removed. A run is changed (a new viscosity, a reseeded field, moved tracers) by building a new
+  `Simulation` that adopts its state and tracers:
+  `Simulation(domain; state, particles = ParticleTracking(tracers; …))` takes the arrays without
+  copying, measures them, and starts its clock at zero.
+- Breaking: a `state` given to `Simulation` must hold the spectrum of a real field. One whose
+  conjugate pairs disagree is refused with an `ArgumentError` that names `reality_projection!` as the
+  repair; before, it was accepted, and the first step projected the violation away.
 
 ## 0.1.1 — 2026-11-02
 
