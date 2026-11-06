@@ -1,10 +1,8 @@
 # API overview
 
-The package is an umbrella module (`GBGHomogeneousTurbulence`) assembled from submodules, which
-build on one another in the order `SimulationDomain` → `Observables` → `State` → `Cache` → `Forcing` →
-`Generator` → `Propagator` → `Particles` → `SimulationRun`. The pages below follow reading order instead:
-`SimulationRun` comes first because a run is what a user builds first, and
-the pieces it composes follow. The umbrella re-exports the public surface of every submodule, so
+The package is an umbrella module (`GBGHomogeneousTurbulence`) assembled from submodules. The pages
+below start from `SimulationRun`, because a run is what a user builds first, and the pieces it
+composes follow. The umbrella re-exports the public surface of every submodule, so
 `using GBGHomogeneousTurbulence` brings the whole of it into scope.
 
 - [GBGHomogeneousTurbulence](api/GBGHomogeneousTurbulence.md): the top-level module and public re-export surface.
