@@ -15,7 +15,6 @@ using GBGPeriodicFields: field_data
   # Zero the velocity by hand: ε = ν⟨|ω|²⟩ is then exactly zero, which routes the criterion
   # into its no-dissipation warning branch. The criterion reads the spectral field directly.
   fill!(field_data(sim.state.velocity_spectral), 0)
-  fields_modified!(sim.cache)
 
   criterion = StationarityCriterion()
   logs, result = Test.collect_test_logs() do

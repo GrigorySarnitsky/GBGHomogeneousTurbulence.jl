@@ -19,6 +19,7 @@
 # If (2) ever fails, the mid-iteration read really did consume a wrong value and the claim is real.
 
 using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: advance_fields_epoch!
 using GBGPeriodicFields: point_positions
 using GBGPeriodicFields: point_values
 using Random
@@ -38,7 +39,7 @@ end
   # ————— (1) the run layer's guard on a genuinely stale sample —————
   guarded = fresh_sim(1)
   advance!(guarded; dt = dt)
-  fields_modified!(guarded.cache)               # a state change made outside the iteration: the sample is now stale
+  advance_fields_epoch!(guarded.cache)          # a step's epoch advance with no closing deposit: the sample is now stale
   @test_throws ErrorException velocity_at_particles(guarded.cache)
   @test_throws ErrorException advance!(guarded; dt = dt)
 

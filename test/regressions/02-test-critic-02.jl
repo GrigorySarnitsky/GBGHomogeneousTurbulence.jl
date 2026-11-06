@@ -8,7 +8,7 @@
 # here rather than pass the suite silently.
 
 using Test, Random, GBGHomogeneousTurbulence
-using GBGHomogeneousTurbulence.Cache: advance_particles_epoch!
+using GBGHomogeneousTurbulence.Cache: advance_fields_epoch!, advance_particles_epoch!
 
 build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
                      particles = ParticleTracking(number_of_particles = 4),
@@ -20,22 +20,15 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
   advance!(sim; dt = 0.01)
   @test size(velocity_at_particles(sim.cache)) == (4, 3)
 
-  # (1) A fields-only change made outside the iteration. The positions are untouched, so the particles epoch
-  #     still matches; only `velocity_at_particles_fields_epoch` falls behind, and the read must still throw.
-  fields_modified!(sim.cache)
+  # (1) A fields-only advance. The positions are untouched, so the particles epoch still matches;
+  #     only `velocity_at_particles_fields_epoch` falls behind, and the read must still throw.
+  advance_fields_epoch!(sim.cache)
   @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch   # the other counter agrees
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
-  # (2) A particles-only mutation. The fields are untouched, so the fields epoch still matches;
-  #     only `velocity_at_particles_particles_epoch` falls behind, and the read must still throw.
-  sim = build()
-  advance!(sim; dt = 0.01)
-  particles_modified!(sim.cache)                       # the documented reposition announcement
-  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch         # the other counter agrees
-  @test_throws ErrorException velocity_at_particles(sim.cache)
-
-  # (2b) The same direction through the run's own tracer-advance verb, which bumps the particles
-  #      epoch without discarding the sample history.
+  # (2) A particles-only advance, the run's own tracer-advance verb. The fields are untouched, so the
+  #     fields epoch still matches; only `velocity_at_particles_particles_epoch` falls behind, and the
+  #     read must still throw.
   sim = build()
   advance!(sim; dt = 0.01)
   advance_particles_epoch!(sim.cache)
@@ -43,11 +36,11 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
   # (3) The particle deposit restores the read in ONE act: `deposit!(cache, tracers, u)` writes and
-  #     stamps BOTH epochs together (decision 71), so nothing between the announcement and the
-  #     deposit can serve the slot, and nothing after the deposit refuses it.
+  #     stamps BOTH epochs together (decision 71), so nothing between the push and the deposit can
+  #     serve the slot, and nothing after the deposit refuses it.
   sim = build()
   advance!(sim; dt = 0.01)
-  particles_modified!(sim.cache)
+  advance_particles_epoch!(sim.cache)
   @test_throws ErrorException velocity_at_particles(sim.cache)
   deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   @test size(velocity_at_particles(sim.cache)) == (4, 3)

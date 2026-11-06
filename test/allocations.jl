@@ -12,7 +12,7 @@
 # transforms is priced at its plan executions, and the iteration's count is the compute audit's own
 # transform ledger (`test/audit_ops.jl`), so the two audits cannot disagree on it. Two kinds of call
 # get a wider, stated bound: the seeders, which draw on the host so a seed gives the same field on
-# every backend, and `fields_modified!`, whose reality check is O(N²).
+# every backend.
 #
 # This audit sits beside the package's own: `test/memory_audit.jl` ledgers what a run keeps resident,
 # and bounds a full iteration against it. This file bounds each operation alone.
@@ -23,9 +23,8 @@ using Random
 using Logging
 using GBGHomogeneousTurbulence.Generator: prepare!, finalize!, velocity_rhs!, scalar_rhs!
 using GBGHomogeneousTurbulence.Forcing: add_forcing_source!, prepare_forcing!, project_forcing!
-using GBGHomogeneousTurbulence.Particles: advect!, restart!, new_vector_point_values
+using GBGHomogeneousTurbulence.Particles: advect!, new_vector_point_values
 using GBGHomogeneousTurbulence.Propagator: step!, deposit!
-using GBGHomogeneousTurbulence.Cache: fields_modified!, particles_modified!
 import GBGCodingTools
 using GBGCodingTools.TestHarness: @alloc_below, field_threshold
 include("audit_ops.jl")
@@ -59,8 +58,6 @@ const SCALAR_BYTES = sizeof(field_data(Φ))
 # Plan executions per iteration of this run (IFLowStorageRK3, TwoThirds, with a scalar), from the
 # compute audit's transform ledger: each execution transforms one component.
 const ITERATION_TRANSFORMS = sum(_transforms(_ops(:RK3, :TwoThirds, true)))
-# The reality check reads the self-conjugate planes: O(N²), measured at six planes per component.
-const REALITY_CHECK_BYTES = 8 * 4 * N^2 * sizeof(ComplexF64)
 
 bound(; transforms = 1) = field_threshold(VECTOR_BYTES; components = transforms)
 
@@ -68,8 +65,13 @@ bound(; transforms = 1) = field_threshold(VECTOR_BYTES; components = transforms)
 # reads first, `false` after the iteration. Named, since `@alloc_below` evaluates its call twice.
 const CALLBACK_CALLS = Ref(0)
 one_iteration(sim) = isodd(CALLBACK_CALLS[] += 1)
+# The closing deposits of an iteration, the field form then the particle form, as `advance!` makes them.
+deposit_all!(sim) = (deposit!(sim.cache, sim.state, sim.domain, sim.buffers);
+                     deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache);
+                              traversal = sim.particle_traversal);
+                     sim)
 # `step!` opens an iteration its closing deposit must end before the next can begin.
-deposited_cache(sim) = (deposit!(sim); sim.cache)
+deposited_cache(sim) = (deposit_all!(sim); sim.cache)
 
 
 @testset "allocation audit: every in-place operation, on the CPU" begin
@@ -78,18 +80,9 @@ deposited_cache(sim) = (deposit!(sim); sim.cache)
     @alloc_below bound(transforms = ITERATION_TRANSFORMS) run!(one_iteration, SIM)
     @alloc_below bound(transforms = ITERATION_TRANSFORMS) step!(SIM.field_integration_scheme, STATE, GENERATOR,
                                                              DOMAIN, BUFFERS, deposited_cache(SIM), 1e-3)
-    deposit!(SIM)
+    deposit_all!(SIM)
     @alloc_below bound(transforms = 7) deposit!(CACHE, STATE, DOMAIN, BUFFERS)   # recovers u, ω and φ
-    @alloc_below bound(transforms = 7) deposit!(SIM)
     @alloc_below bound() deposit!(CACHE, SIM.tracers, velocity_physical(CACHE))
-    @alloc_below bound() + REALITY_CHECK_BYTES fields_modified!(SIM)
-    deposit!(SIM)
-    @alloc_below bound() fields_modified!(CACHE)
-    deposit!(SIM)
-    @alloc_below bound() particles_modified!(SIM)
-    deposit!(SIM)
-    @alloc_below bound() particles_modified!(CACHE)
-    deposit!(SIM)
   end
 
   @testset "the generator" begin
@@ -115,13 +108,12 @@ deposited_cache(sim) = (deposit!(sim); sim.cache)
   end
 
   @testset "the particles" begin
-    deposit!(SIM)
+    deposit_all!(SIM)
     @alloc_below bound() advect!(SIM.particle_integration_scheme, SIM.tracers, velocity_physical(CACHE), DOMAIN,
                                  SIM.particle_buffers, 1e-3)
     @alloc_below bound() interpolate_at_particles!(SAMPLES, velocity_physical(CACHE), SIM.tracers)
     @alloc_below bound() rebuild_traversal!(SIM)
-    @alloc_below bound() restart!(SIM.particle_integration_scheme, SIM.particle_buffers)
-    fields_modified!(SIM); deposit!(SIM)
+    deposit_all!(SIM)
   end
 
   @testset "the seeders: one noise field, drawn into directly on the CPU" begin
@@ -131,7 +123,7 @@ deposited_cache(sim) = (deposit!(sim); sim.cache)
       STATE.velocity_spectral, DOMAIN, 1.5; peak_shell = 2.0, rng = SEED)
     @alloc_below SCALAR_BYTES + bound() random_scalar_spectral!(
       STATE.scalar_spectral, DOMAIN, 1.0; peak_shell = 2.0, rng = SEED)
-    fields_modified!(SIM); deposit!(SIM)
+    deposit_all!(SIM)
   end
 end
 

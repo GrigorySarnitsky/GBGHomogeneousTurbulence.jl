@@ -24,8 +24,7 @@ using GBGHomogeneousTurbulence.Forcing: AbstractForcing, DeferredForcing, NoForc
                                       ConstantPower, VarianceRescaling, VarianceController,
                                       StochasticOU, StochasticOUState
 import GBGHomogeneousTurbulence.Forcing: write_forcing, read_forcing
-using GBGHomogeneousTurbulence.Cache: fields_modified!, particles_modified!
-using GBGHomogeneousTurbulence.Propagator: IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, IFHeun, deposit!
+using GBGHomogeneousTurbulence.Propagator: IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, IFHeun
 using GBGHomogeneousTurbulence.SimulationRun: Simulation, PassiveScalar, ParticleTracking
 import GBGHomogeneousTurbulence.SimulationRun: write_simulation, read_simulation
 
@@ -445,9 +444,6 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
   end
   sim = Simulation(domain; viscosity = a["viscosity"], scalar, velocity_forcing,
                    field_integration_scheme, cfl = a["cfl"], max_dt = a["max_dt"], particles, state)
-  # The announcement and the closing deposits replay the constructor's schedule over the adopted
-  # state and tracers, so every derived slot is recomputed rather than read; the stored sample
-  # history is restored after them.
   # The forcing states continue where they were written. The constructor started fresh ones on the
   # stored forcings; each is overwritten in place, so the run's record keeps its own objects.
   for (entry, key) in FORCING_STATE_GROUPS
@@ -462,8 +458,8 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
     adapt!(current.process, stored.process)
     current.draws = stored.draws
   end
-  fields_modified!(sim)
-  deposit!(sim)
+  # The constructor's deposits measured the adopted state and tracers; the stored sample history is
+  # restored after them.
   if has_tracers && haskey(g, "sample_history")
     hg = _require_group(g, "sample_history", "read_simulation")
     steps = a["history_steps"]

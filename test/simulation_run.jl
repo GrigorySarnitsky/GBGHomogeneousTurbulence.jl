@@ -131,7 +131,7 @@ using Test
     end
     # A slot taken as a producer's register mid-iteration makes its checked read throw; the
     # display names the reads without performing them, so it must print regardless.
-    fields_modified!(bare.cache)
+    GBGHomogeneousTurbulence.Cache.take_velocity!(bare.cache)
     @test_throws ErrorException velocity_physical(bare.cache)
     @test occursin("velocity_physical(sim.cache)", sprint(show, MIME"text/plain"(), bare))
     @test sprint(show, bare) == "Simulation(16×16×16 grid, time 0.0, step 0)"

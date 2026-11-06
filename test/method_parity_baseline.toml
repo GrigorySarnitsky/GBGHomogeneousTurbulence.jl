@@ -73,12 +73,6 @@ count = 1
 module = "Particles"
 
 [[generic]]
-set = "SimulationRun"
-name = "deposit!"
-count = 1
-module = "SimulationRun"
-
-[[generic]]
 set = "Observables"
 name = "derivative_skewness"
 count = 1
@@ -105,18 +99,6 @@ module = "SimulationRun"
 [[generic]]
 set = "SimulationRun"
 name = "every_time"
-count = 1
-module = "SimulationRun"
-
-[[generic]]
-set = "Cache"
-name = "fields_modified!"
-count = 1
-module = "Cache"
-
-[[generic]]
-set = "SimulationRun"
-name = "fields_modified!"
 count = 1
 module = "SimulationRun"
 
@@ -271,18 +253,6 @@ count = 1
 module = "Particles"
 
 [[generic]]
-set = "Cache"
-name = "particles_modified!"
-count = 1
-module = "Cache"
-
-[[generic]]
-set = "SimulationRun"
-name = "particles_modified!"
-count = 1
-module = "SimulationRun"
-
-[[generic]]
 set = "SimulationRun"
 name = "predicted_stationary_state"
 count = 1
@@ -335,12 +305,6 @@ set = "Propagator"
 name = "recommended_cfl"
 count = 1
 module = "Propagator"
-
-[[generic]]
-set = "Particles"
-name = "restart!"
-count = 2
-module = "Particles"
 
 [[generic]]
 set = "Observables"
@@ -514,9 +478,9 @@ module = "SimulationRun"
 SimulationDomain = 25
 Observables = 21  # +1 (2026-10-16): `scalar_variance_and_dissipation`, the scalar twin of the fused velocity pair; +4 the same day: `integral_length(spectrum)`, `taylor_length`, `kolmogorov_time`, `kolmogorov_velocity` (decision 114)
 State = 8  # +1 (2026-11-06): `_peak_wavenumber`, the seed's κ_p from its shell in units of 2π/L (decision 117); +1 (2026-11-06): `_seed_envelope`, the one envelope both seeders share (decision 119)
-Cache = 23
+Cache = 21  # −2 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state
 Forcing = 77  # +3 (2026-10-14): the deferred display's `_run_filled` (6) and `_either_or` (2) replace `_design_keyword` (5)
 Generator = 25
 Propagator = 22
-Particles = 23  # +2 (2026-10-14): `_order`, the two methods unwrapping a `ParticleTraversal` for the gathers (moved from SimulationRun)
-SimulationRun = 47  # −1 (2026-10-15): `flow_parameters` left the run layer, which no longer reaches the Phenomenology leaf (decision 112); +1 (2026-10-14): `_turnover_time`, the flow's 2k/(3ε) a controller takes; +3 (2026-10-14): `ParticleTracking`'s two constructors and `_check_traversal_mode`; +1 (2026-10-14): `PassiveScalar`'s keyword constructor; +2 (2026-10-14): `_seeded`, the two methods filling a deferred `StochasticOU` seed from the run's rng; −2 (2026-10-14): `_traversal_order` moved to Particles as `_order`; +1 (2026-10-12): `_predicted_stationary_state`, the Float64 prediction the public one converts to the domain's element type
+Particles = 21  # −2 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state; +2 (2026-10-14): `_order`, the two methods unwrapping a `ParticleTraversal` for the gathers (moved from SimulationRun)
+SimulationRun = 43  # −4 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state; −1 (2026-10-15): `flow_parameters` left the run layer, which no longer reaches the Phenomenology leaf (decision 112); +1 (2026-10-14): `_turnover_time`, the flow's 2k/(3ε) a controller takes; +3 (2026-10-14): `ParticleTracking`'s two constructors and `_check_traversal_mode`; +1 (2026-10-14): `PassiveScalar`'s keyword constructor; +2 (2026-10-14): `_seeded`, the two methods filling a deferred `StochasticOU` seed from the run's rng; −2 (2026-10-14): `_traversal_order` moved to Particles as `_order`; +1 (2026-10-12): `_predicted_stationary_state`, the Float64 prediction the public one converts to the domain's element type

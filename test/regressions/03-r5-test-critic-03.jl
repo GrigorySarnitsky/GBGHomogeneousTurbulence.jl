@@ -6,9 +6,9 @@
 # states: the sample is current only when BOTH counters match its own, so a mutation of EITHER
 # factor alone must make the read throw. The two halves are exercised independently:
 #
-#   (1) `fields_modified!(cache)` alone — the tracer positions are untouched, so
+#   (1) `advance_fields_epoch!(cache)` alone — the tracer positions are untouched, so
 #       `velocity_at_particles_particles_epoch == particles_epoch` still holds and only the fields half can fire;
-#   (2) `particles_modified!(cache)` alone — the fields are untouched, so
+#   (2) `advance_particles_epoch!(cache)` alone — the fields are untouched, so
 #       `velocity_at_particles_fields_epoch == fields_epoch` still holds and only the particles half can fire.
 #
 # Each case pins the *other* counter as still-matching before asserting the throw, which is what
@@ -17,7 +17,7 @@
 
 using Test, Random
 using GBGHomogeneousTurbulence
-using GBGHomogeneousTurbulence.Cache: velocity_at_particles, fields_modified!, particles_modified!
+using GBGHomogeneousTurbulence.Cache: velocity_at_particles, advance_fields_epoch!, advance_particles_epoch!
 
 
 build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
@@ -37,7 +37,7 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
   # ————— (1) the fields half alone —————
   sim = build()
   advance!(sim; dt = 0.01)
-  fields_modified!(sim.cache)
+  advance_fields_epoch!(sim.cache)
   # the particles half is still satisfied, so only the fields comparison can raise the throw
   @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch
   @test sim.cache.velocity_at_particles_fields_epoch != sim.cache.fields_epoch
@@ -46,13 +46,13 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
   # ————— (2) the particles half alone —————
   sim = build()
   advance!(sim; dt = 0.01)
-  particles_modified!(sim.cache)
+  advance_particles_epoch!(sim.cache)
   # the fields half is still satisfied, so only the particles comparison can raise the throw
   @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch
   @test sim.cache.velocity_at_particles_particles_epoch != sim.cache.particles_epoch
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
-  # ————— and the sanctioned completion restores the read in the particles direction —————
+  # ————— and the particle deposit restores the read in the particles direction —————
   deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   @test size(velocity_at_particles(sim.cache)) == (4, 3)
 end

@@ -244,10 +244,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   causes a computation.
 
   Freshness is tracked by one epoch counter per dynamical factor of the run — fields, particles.
-  A completed `step!` advances the fields epoch. A change to the state's spectral representation made outside the iteration is
-  the one freshness event the cache cannot detect itself, so it is declared through
-  `fields_modified!` — or, for such a change to the tracer positions, through the particle-side
-  twin `particles_modified!` — and followed by a `deposit!` before the run advances again (§11
+  A completed `step!` advances the fields epoch, and every `advect!` push the particles epoch (§11
   decision 30). The `State` module's initial conditions seed the state:
   `random_solenoidal_velocity_spectral!` fills a divergence-free velocity with a large-scale spectral envelope,
   rescaled to a target ``k``, and `random_scalar_spectral!` fills a mean-zero scalar to a target variance. The

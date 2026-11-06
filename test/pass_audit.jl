@@ -193,10 +193,6 @@ GBGCodingTools.TestHarness.traffic_completeness(HT, OWNED_MODULES;
                                              "an initial-condition call, outside the iteration the compute audit prices",
     :random_scalar_spectral! => "transforms the host draw, and FFT plans reject wrapped storage; an " *
                                 "initial-condition call, outside the iteration the compute audit prices",
-    :fields_modified!    => "advances an epoch counter and restarts the particle registers; its only field " *
-                            "reads are the O(N²) reality check's self-conjugate planes, not a field pass",
-    :particles_modified! => "advances an epoch counter; it takes no field",
-    :restart!            => "clears a particle scheme's O(M) history; it takes no field",
     :rebuild_traversal!  => "a counting sort over the tracer positions through Atomix, which a wrapper array " *
                             "cannot provide (PF exempts its own `point_traversal_order!` for the same reason); " *
                             "it reads no field",

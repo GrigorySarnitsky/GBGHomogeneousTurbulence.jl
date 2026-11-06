@@ -161,8 +161,7 @@ end
                      particles = ParticleTracking(number_of_particles = 32,
                                                   particle_integration_scheme = AdamsBashforth(order = 4)),
                      rng = MersenneTwister(7))
-    # The sample history is the cache's: it holds earlier values of a deposited observable, so an
-    # announced reposition invalidates it where the epoch lives rather than in the scheme's registers.
+    # The sample history is the cache's: it holds earlier values of a deposited observable.
     @test sim.particle_buffers isa ParticleIntegratorBuffers
     @test sim.cache.history_filled == 0               # nothing recorded before the first step
     advance!(sim)
@@ -170,15 +169,10 @@ end
     for _ in 1:4; advance!(sim); end
     @test sim.cache.history_filled == 3               # history full: AB4 from here on
 
-    # The run's own advance must NOT be read as a reposition made outside the iteration: it announces the tracer
-    # push every step, and clearing the history there would pin the scheme in its bootstrap forever.
+    # The run's own advance keeps the history full: clearing it there would pin the scheme in its
+    # bootstrap forever.
     advance!(sim)
     @test sim.cache.history_filled == 3
-
-    # An announced reposition does clear it, through the cache that owns both the epoch and the
-    # samples — no second call, and no reference from the cache to the scheme's registers.
-    particles_modified!(sim.cache)
-    @test sim.cache.history_filled == 0
     @test all(isfinite, point_positions(sim.tracers.positions))
   end
 
@@ -235,16 +229,6 @@ end
     fresh = ParticleTraversal(man.domain, man.tracers)
     @test Array(man.particle_traversal.order.indices) == Array(fresh.order.indices)
     @test sort(Int.(Array(fresh.order.indices))) == 1:300
-
-    # A reposition then an advance still matches the run without an order: the automatic rebuild
-    # reads the start-of-step positions, so an announced reseed needs no traversal verb of its own.
-    on = tracked(:automatic; steps = 2); off = tracked(:none; steps = 2)
-    for s in (on, off)
-      copyto!(point_positions(s.tracers.positions),
-              s.domain.grid.domain_size[1] .* rand(MersenneTwister(11), 300, 3))
-      particles_modified!(s); deposit!(s); advance!(s)
-    end
-    @test point_positions(on.tracers.positions) == point_positions(off.tracers.positions)
   end
 
   @testset "the traversal order adds no per-step allocation that scales with M" begin

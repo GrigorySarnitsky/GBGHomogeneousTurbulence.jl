@@ -1,7 +1,6 @@
 # ObservablesCache tests — the no-recompute contract: a read serves the deposited value or throws
 # (never rebuilds); slots double as the step's registers (taken mid-iteration, re-deposited at the
-# end); `fields_modified!` announces a change made outside the iteration and `deposit!` restores the
-# deposits; the completeness check refuses an iteration that left a slot undeposited.
+# end); the completeness check refuses an iteration that left a slot undeposited.
 
 using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.Cache: take_velocity!, check_deposits
@@ -46,21 +45,6 @@ using Test
     @test velocity_physical(cache) isa Any
   end
 
-  @testset "a change made outside the iteration: announce, then re-deposit" begin
-    cache = ObservablesCache(domain)
-    deposit!(cache, state, domain, buffers)
-    before = copy(field_data(velocity_physical(cache)))
-    random_solenoidal_velocity_spectral!(û, domain, 0.7; peak_shell = 3.0, rng = MersenneTwister(2))
-    fields_modified!(cache)
-    @test_throws ErrorException velocity_physical(cache)         # stale: nothing is recomputed
-    deposit!(cache, state, domain, buffers)
-    after = field_data(velocity_physical(cache))
-    @test after != before                                          # the new deposit is the new field
-    u_reference = new_vector_field_physical(domain)
-    to_physical!(u_reference, û, domain.transform_plans, new_vector_field_spectral(domain))
-    @test after == field_data(u_reference)
-  end
-
   @testset "a scalar-free cache has no scalar slot" begin
     cache = ObservablesCache(domain)
     @test_throws ArgumentError scalar_physical(cache)
@@ -83,20 +67,5 @@ using Test
     deposit!(cache, state, domain, buffers)
     @test check_deposits(cache) === cache
     @test field_data(velocity_physical(cache)) != u_before       # the advanced state's recovery
-  end
-
-  # A `Simulation` carries the cache; it is not itself a reading surface (decision 49). The user
-  # reaches a deposited observable through `sim.cache` and the state through `sim.state`, so this
-  # exercises the announce/re-deposit cycle on those two directly.
-  @testset "the announce/re-deposit cycle on a live run" begin
-    sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; rng = MersenneTwister(4))
-    u = velocity_physical(sim.cache)                                # the constructor's seeding deposit
-    @test u === velocity_physical(sim.cache)
-    random_solenoidal_velocity_spectral!(sim.state.velocity_spectral, sim.domain, 0.9;
-                                peak_shell = 2.0, rng = MersenneTwister(5))
-    fields_modified!(sim.cache)
-    @test_throws ErrorException velocity_physical(sim.cache)
-    deposit!(sim)
-    @test kinetic_energy(velocity_physical(sim.cache)) ≈ kinetic_energy(sim.state.velocity_spectral)
   end
 end

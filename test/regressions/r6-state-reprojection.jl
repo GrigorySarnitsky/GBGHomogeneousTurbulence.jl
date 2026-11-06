@@ -3,8 +3,7 @@
 # state was not: divergence injected at roundoff by the stage combinations was damped only by
 # exp(−νκ²Δt) — nearly nothing at the largest scales — and, measured in Float32 at 32³, grew
 # ×120 per 1500 steps to 800×eps by step 2000. The discriminating half injects a LARGE divergent
-# component by hand (the fields_modified! escape hatch): one step must scrub it to roundoff,
-# which no viscous decay could fake.
+# component by hand: one step must scrub it to roundoff, which no viscous decay could fake.
 using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: divergence, l2norm, field_data, gradient!
 using Random
@@ -28,9 +27,7 @@ using Random
     ∇ĝ = new_vector_field_spectral(sim.domain)
     gradient!(∇ĝ, ĝ, sim.domain.multipliers)
     field_data(û) .+= field_data(∇ĝ)
-    # The full escape-hatch recipe: announce the mutation, then re-deposit so the cache serves the
-    # mutated state (nothing in the cache is ever recomputed on a read).
-    fields_modified!(sim.cache)
+    # Re-deposit so the cache serves the mutated state (nothing in the cache is ever recomputed on a read).
     deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
     before = l2norm(divergence(û, sim.domain.multipliers))
     @test before > 1.0                           # the corruption is real and large

@@ -49,7 +49,6 @@ velocity, and the next iteration's [`advect!`](@ref GBGHomogeneousTurbulence.Par
 
 ```@docs
 advect!
-restart!
 history_depth
 interpolate_at_particles!
 ```

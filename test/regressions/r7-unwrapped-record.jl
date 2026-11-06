@@ -2,9 +2,8 @@
 # state and stay in [0, L); the unwrapped record receives the SAME displacement terms through the
 # grid-free displace! and keeps the winding — on a uniform steady flow the Heun push is exact, so
 # the record must equal the analytic X₀ + u·t across several box crossings while the wrapped
-# positions equal its box reduction. A reposition announced through particles_modified! restarts
-# the record (winding belongs to the abandoned trajectory), and an untracked set refuses the read.
-using Test, Random
+# positions equal its box reduction. An untracked set refuses the read.
+using Test
 using GBGPeriodicFields: point_positions, npoints
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
@@ -54,12 +53,4 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   # An untracked set refuses the read with an actionable error.
   bare = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
   @test_throws ArgumentError point_positions(unwrapped_positions(bare))
-
-  # A reposition through the run's announcement restarts the record at the new positions.
-  sim = Simulation(domain; viscosity = 0.05, particles = ParticleTracking(number_of_particles = 4, unwrapped = true),
-                   rng = MersenneTwister(1))
-  for _ in 1:3; advance!(sim); end
-  point_positions(sim.tracers.positions) .= 0.5                 # hand reposition (outside the iteration)
-  particles_modified!(sim)
-  @test all(point_positions(unwrapped_positions(sim.tracers)) .== 0.5)    # winding restarted with the new path
 end

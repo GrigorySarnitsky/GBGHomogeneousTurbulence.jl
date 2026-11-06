@@ -14,10 +14,9 @@ using GBGPeriodicFields: field_data
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = PassiveScalar(),
                    rng = MersenneTwister(2))
 
-  # The sanctioned route outside the iteration: write the state's storage directly, announce it, re-deposit.
+  # Poison the scalar's storage directly and refresh the cache from it.
   field_data(sim.state.scalar_spectral)[3, 3, 3] = NaN + 0im
-  fields_modified!(sim.cache)
-  deposit!(sim)
+  deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
 
   # The velocity is untouched — this is a scalar-only blow-up, invisible to `max_speed`.
   @test all(isfinite, field_data(velocity_physical(sim.cache)))

@@ -202,15 +202,6 @@ The seed is a starting point for the warm-up, not an initial condition the packa
 the field a run begins measuring is the one its warm-up has brought to stationarity.
 
 Returns `û`.
-
-!!! note "Seeding a running simulation invalidates the observables cache"
-    The cache holds what the last
-    [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) — the end-of-step write of the
-    observables — left, so a seed written into a live run makes every cached observable wrong. Announce the change with
-    [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!), which advances the
-    fields epoch — the cache's freshness counter — so cached reads throw rather than serve stale
-    values, then restore the cache with `deposit!` before advancing again. The
-    interval between the two calls is yours to close.
 """
 function random_solenoidal_velocity_spectral!(û, domain::FixedDomain, kinetic_energy::Real;
                                      peak_shell::Real = DEFAULT_PEAK_SHELL,
@@ -273,15 +264,6 @@ As for the velocity, the seed is a starting point for the warm-up, not an initia
 package vouches for.
 
 Returns `φ̂`.
-
-!!! note "Seeding a running simulation invalidates the observables cache"
-    The cache holds what the last
-    [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) — the end-of-step write of the
-    observables — left, so a seed written into a live run makes every cached observable wrong. Announce the change with
-    [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!), which advances the
-    fields epoch — the cache's freshness counter — so cached reads throw rather than serve stale
-    values, then restore the cache with `deposit!` before advancing again. The
-    interval between the two calls is yours to close.
 """
 function random_scalar_spectral!(φ̂, domain::FixedDomain, scalar_variance::Real;
                         peak_shell::Real = DEFAULT_PEAK_SHELL,

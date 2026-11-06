@@ -16,9 +16,6 @@ const ALLOWED = Dict(
   ("src/SimulationDomain.jl", "fill!(field_data(f), zero(eltype(field_data(f))))") =>
     "PF 2026-09-28: PF's constructors return uninitialized memory and PF has no zeroing operation; " *
     "multiply!(f, 0, f) would keep a NaN",
-  ("src/SimulationRun.jl", "scale = maximum(abs, field_data(field))") =>
-    "PF 2026-09-28: reality_residual is in stored-coefficient units, so the largest stored coefficient " *
-    "is its yardstick; PF's `maximum` is physical-only",
   ("src/Forcing.jl", "randn!(ou.rng, field_data(slots.draws))") =>
     "PF 2026-09-28: the draw is made into a HOST field, so a seed gives the same realization on every " *
     "backend; adapt! then moves it",
@@ -73,10 +70,11 @@ end
     open(joinpath(tree, "src", "Observables.jl"), "a") do io
       println(io, "_planted(u) = field_data(u) .*= 2")
     end
-    run_file = joinpath(tree, "src", "SimulationRun.jl")
-    write(run_file, replace(read(run_file, String), "scale = maximum(abs, field_data(field))" => "scale = 1"))
+    forcing_file = joinpath(tree, "src", "Forcing.jl")
+    write(forcing_file, replace(read(forcing_file, String),
+                                "randn!(ou.rng, field_data(slots.draws))" => "randn!(ou.rng, slots.draws)"))
     planted_unlisted, planted_stale, _ = unlisted_and_stale(tree)
     @test any(s -> s[1] == "src/Observables.jl" && occursin("_planted", s[3]), planted_unlisted)
-    @test ("src/SimulationRun.jl", "scale = maximum(abs, field_data(field))") in planted_stale
+    @test ("src/Forcing.jl", "randn!(ou.rng, field_data(slots.draws))") in planted_stale
   end
 end

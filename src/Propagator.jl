@@ -48,7 +48,7 @@ using ..Generator: ResolvedGenerator, prepare!, finalize!,
                    velocity_rhs!, scalar_rhs!, velocity_integrating_factor, scalar_integrating_factor
 using ..State: ResolvedFields
 using ..Cache: ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-               fields_modified!, advance_fields_epoch!,
+               advance_fields_epoch!,
                take_velocity!, take_vorticity!, take_scalar!,
                deposit_velocity!, deposit_vorticity!, deposit_scalar!, deposit_max_speed!
 using ..Observables: max_speed, vorticity_physical!
@@ -763,7 +763,6 @@ _recovery_scratch(sb::ScalarBuffers) =
 """
     deposit!(cache, state, domain, buffers)
     deposit!(cache, tracers, u; traversal = nothing)
-    deposit!(sim)
 
 Close a producer's advance (the step or the tracer push) by depositing the observables it has
 just made measurable: compute them
@@ -789,8 +788,6 @@ closes as `step!` then `deposit!`, then
   [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) (its `order`
   field) for the gather, or `nothing` for the tracers' own order; the values are identical either
   way.
-- `sim` — `sim` form: the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) to
-  unpack.
 
 The field form deposits the field-derived slots — the velocity, vorticity and, when the run
 carries one, scalar recoveries in physical representation, then the maximum-speed reduction over
@@ -813,14 +810,11 @@ reads — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint f
 
 Every iteration ends with these deposits: the run's
 [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) performs them for you, the
-`Simulation` constructor makes the first
+[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor makes the first
 deposits so the first iteration finds the initial state's observables, and a hand-run loop calls
-each form itself after the advance it closes. After mutating the state or the positions from
-outside the iteration, announce it — [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!) /
-[`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) — and re-deposit
-with the `sim` form, which performs every deposit the run's configuration carries.
+each form itself after the advance it closes.
 
-Returns `cache` (or `sim`).
+Returns `cache`.
 """
 function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
                   buffers::IntegratorBuffers)

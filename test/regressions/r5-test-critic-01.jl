@@ -38,8 +38,7 @@ end
 
   # Scalar only — the velocity stays finite, so `max_speed` cannot see this blow-up.
   field_data(sim.state.scalar_spectral)[3, 3, 3] = NaN + 0im
-  fields_modified!(sim.cache)
-  deposit!(sim)
+  deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   @test all(isfinite, field_data(velocity_physical(sim.cache)))   # sanity: velocity untouched
 
   err = try

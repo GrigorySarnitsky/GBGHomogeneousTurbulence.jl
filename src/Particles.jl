@@ -31,9 +31,7 @@ It tracks Lagrangian particles, today the massless tracer:
   method: interpolate the flow velocity at the tracers' current positions and deposit it in the
   observables cache. One value has two consumers: the Lagrangian statistics a caller accumulates,
   and the next advance, which reads it as its start-of-step velocity.
-- [`advect!`](@ref) — advance the trajectories one step under the chosen scheme;
-  [`restart!`](@ref) discards a scheme's history after the tracers are repositioned from outside
-  the iteration.
+- [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
 - [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate the output buffers it fills.
 - [`ParticleTraversal`](@ref) — the memory-locality order the gathers visit the tracers in, a
@@ -55,7 +53,7 @@ import ..Propagator: allocate_buffers, deposit!
 
 export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
        ParticleIntegratorBuffers, ParticleTraversal, rebuild_traversal!,
-       advect!, restart!, history_depth, interpolate_at_particles!,
+       advect!, history_depth, interpolate_at_particles!,
        unwrapped_positions, new_vector_point_values, new_scalar_point_values
 
 
@@ -357,31 +355,6 @@ with positions wrapped into ``[0, L)``, ``L`` the box side.
 struct Heun <: AbstractParticleIntegrator end
 
 
-
-
-"""
-    restart!(scheme, buffers) -> buffers
-
-Discard whatever history `buffers` holds for the particle integration scheme `scheme`, so the
-next [`advect!`](@ref) starts that scheme from scratch.
-
-Call it whenever the tracer positions are changed from outside the iteration — a reseed, a
-hand-written correction, any direct write to the tracer storage. A one-step scheme carries no
-history and this does nothing; a multistep scheme carries Lagrangian samples taken along the
-trajectory just abandoned, and integrating over those would blend the old path with the new one.
-This is an in-memory reset of one scheme's history, not a checkpoint verb — restoring a saved run
-is the job of [`read_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.read_simulation).
-
-The [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) form of
-[`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) calls this for you,
-after announcing the reposition to the observables cache. Its bare-cache form clears only the
-sample history the cache itself holds and cannot dispatch here — so a hand-run loop that announces
-to the cache alone must also call this; a scheme's own per-step buffers beyond that history are
-reached only this way.
-"""
-function restart! end
-
-
 """
     ParticleIntegratorBuffers
 
@@ -398,9 +371,7 @@ scheme uses the predictor arrays for its [`Heun`](@ref) starting steps only, and
 The past Lagrangian samples a multistep scheme integrates over are not held here. They are
 deposited observables — measurements of the velocity along the trajectory — so they live in the
 [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) beside the current sample
-they extend, which is what lets
-[`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) invalidate the whole
-history when the tracers are repositioned.
+they extend.
 
 # Fields
 - `predictor` — the `(M, 3)` predicted positions of the ``M`` tracers, which no tracer ever occupies.
@@ -444,10 +415,6 @@ allocate_buffers(::Heun, tracers::Tracers, cache::ObservablesCache) =
   _allocate_particle_buffers(tracers, cache, 0)
 
 
-# A one-step scheme is memoryless: every register it owns is overwritten before it is read.
-restart!(::Heun, buffers::ParticleIntegratorBuffers) = buffers
-
-
 """
     AdamsBashforth(; order = 4)
 
@@ -474,8 +441,7 @@ step from the actual step history. That is ``\\mathcal{O}(\\texttt{order}^2)`` h
 step, independent of the tracer count.
 
 A multistep method has no history at ``t_0``, so the first `order - 1` steps are taken with
-`Heun` and the scheme then switches over; the same restart happens if the tracers are
-reseeded. Those second-order starting steps leave a fixed error behind, so over a fixed window
+`Heun` and the scheme then switches over. Those second-order starting steps leave a fixed error behind, so over a fixed window
 `order = 4` converges at about third order rather than fourth — on a smooth test problem, ``3.0``
 against ``2.0`` for the two-step method, with an error some fifty times smaller at equal step count.
 A higher-order start would need the velocity between the step endpoints, which the solver does not
@@ -603,8 +569,6 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   dt > 0 || throw(ArgumentError("`dt` must be positive, got $dt: a multistep history cannot carry " *
                                 "a zero-length or reversed step"))
 
-  # The past samples are the cache's, not this scheme's: an announced reposition clears them there,
-  # so a history that survived one is not reachable from here.
   cache = buffers.cache
   past, steps = cache.velocity_at_particles_history, cache.history_steps
   # The history's depth IS the order this call will actually achieve. Handed buffers built for a
@@ -637,7 +601,7 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
     displace!(tracers.positions, domain.grid, terms...)
     tracers.unwrapped_positions === nothing ||
       displace!(tracers.unwrapped_positions, terms...)
-    advance_particles_epoch!(cache)          # the bootstrap branch announced through Heun's push
+    advance_particles_epoch!(cache)          # the bootstrap branch advanced it through Heun's push
   end
 
   # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
@@ -654,9 +618,6 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   end
   return tracers
 end
-
-
-restart!(::AdamsBashforth, buffers::ParticleIntegratorBuffers) = (buffers.cache.history_filled = 0; buffers)
 
 
 # The particle method of `deposit!` — the generic, and the one docstring covering all its forms,
@@ -737,9 +698,9 @@ function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
   tracers.unwrapped_positions === nothing ||
     displace!(tracers.unwrapped_positions,
               (Δt / 2, v₁), (Δt / 2, buffers.velocity_predictor))
-  # The push announces itself (decision 76): the positions changed, so the particles counter moves
-  # and the previously deposited sample reads stale until the closing particle deposit. This keeps
-  # the two-epoch guard live on a hand-run loop, not only under `advance!`.
+  # The positions changed, so the particles counter moves (decision 76) and the previously deposited
+  # sample reads stale until the closing particle deposit. This keeps the two-epoch guard live on a
+  # hand-run loop, not only under `advance!`.
   advance_particles_epoch!(buffers.cache)
   return tracers
 end
@@ -786,9 +747,7 @@ an untracked set throws an `ArgumentError` (which is why this throwing read exis
 state is read straight off the struct's fields). The wrapped positions remain the dynamical state either
 way — the dynamics always advance wrapped, since a coordinate that grows with winding loses
 absolute floating-point resolution, while the unwrapped positions only ever feed differences,
-whose *relative* accuracy the growth does not touch. An announced reposition
-([`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) on a run) restarts
-the unwrapped positions at the wrapped ones: winding is a property of the trajectory just abandoned.
+whose *relative* accuracy the growth does not touch.
 """
 function unwrapped_positions(tracers::Tracers)
   tracers.unwrapped_positions === nothing &&

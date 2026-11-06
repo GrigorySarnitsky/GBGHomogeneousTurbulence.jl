@@ -38,7 +38,7 @@ physical_energy(u) = sum(abs2, field_data(u)) / (2 * prod(size(field_data(u))[1:
       data[1, 2, 1] += im * δ; data[1, N, 1] += im * δ
     end
     @test reality_residual(û) > 0 && reality_residual(φ̂) > 0        # the plant is a real violation
-    fields_modified!(sim.cache); deposit!(sim)                       # the run-level verb refuses a plant, by design
+    deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
     advance!(sim)
     @test reality_residual(sim.state.velocity_spectral) == 0         # exactly: a projection, not a decay
     @test reality_residual(sim.state.scalar_spectral) == 0
@@ -48,7 +48,7 @@ physical_energy(u) = sum(abs2, field_data(u)) / (2 * prod(size(field_data(u))[1:
     # Before the fix the planted 2e-6 grew ×360 over 27 time units and spectral k parted from ½⟨|u|²⟩.
     sim = Simulation(grid_points_per_axis = 32, κ_max_η = 1.5, rng = MersenneTwister(2))
     plant!(sim.state.velocity_spectral, 2e-6)
-    fields_modified!(sim.cache); deposit!(sim)
+    deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
     worst = 0.0
     run!(sim) do s
       if current_step(s) > 0                                         # the step-0 callback sees the plant

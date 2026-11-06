@@ -160,9 +160,8 @@ it is the standing per-iteration traffic cost §1.4 prices.
 **A slot's epoch says which of three states the slot is in**: holding the observable at a
 named ``t_n``, holding the producer's scratch, or holding nothing yet deposited. (In the code the named time is
 an *epoch*: a version number, one per dynamical factor. The fields' epoch rises by one with every
-completed step or announced mutation, the particles' with every push or announced reposition, and a
-slot's epoch is current when it equals its factor's. An announced mutation raises an epoch without
-an iteration, so the fields' epoch runs ahead of the step count.) A read is served only in the
+completed step, the particles' with every push, and a slot's epoch is current when it equals its
+factor's.) A read is served only in the
 first case, and only when the named time is the current one; otherwise it throws. What a stale read
 reports is that the schedule is wrong — the caller asked at a moment the schedule does not fill — and
 the only repair is to fix the schedule.
@@ -181,14 +180,6 @@ epoch is still at the value that marks it cleared — an un-redeposited slot. Th
 — so the check guards the solver against its own future edits: a slot nobody refilled would hold scratch for the
 rest of the run and throw on every later read, and the completeness check names the fault where it
 happened.
-
-Code that writes the state outside an iteration — a reseed, a filter — must announce the change by
-calling [`fields_modified!`](@ref), which advances the fields counter past every slot, so that reads
-throw
-until the next deposit. That interval belongs to whoever made the change: the recoveries stay callable — the field ones
-through the backend ([`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)' four-argument `to_physical!`), the vorticity through this
-package's [`vorticity_physical!`](@ref) — so a caller who mutates the state mid-run computes what
-they need themselves, in their own buffer.
 
 **The numbers follow the same rule on the same schedule.** The maximum speed is a cache entry like
 any other — deposited at the iteration's end, at that epoch, and read by the next iteration's timestep choice,
@@ -343,10 +334,9 @@ spline by default, so the sampled velocity is continuously differentiable along 
 A multistep particle integration scheme looks further back, and the cache is where that history lives: built
 with `history_depth > 1` it keeps a bounded ring of past velocity samples —
 `history_depth - 1` further ``M\times3`` arrays beyond the current slot — which [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)
-integrates over and a reposition made outside the iteration discards ([`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!)). The history rides
+integrates over. The history rides
 the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
-latest deposit, and it exists here rather than in the scheme's registers because the object that
-owns the epoch owns the invalidation.
+latest deposit.
 
 ### 2.4 What it caches
 
@@ -364,7 +354,7 @@ there is no moment to date it to, so no act between iterations builds it either.
 | ``\boldsymbol{\omega}`` | physical, grid | yes | the closing recovery; read by the advective-term assembly |
 | ``\varphi`` | physical, grid | yes | the closing recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity at the particles | ``M\times3`` at points | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
-| the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | kept only when a multistep particle integration scheme asks for depth; rotated at each sample deposit, discarded by a reposition made outside the iteration |
+| the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | kept only when a multistep particle integration scheme asks for depth; rotated at each sample deposit |
 | the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | the closing reduction over the cached velocity; read by the next timestep choice |
 | ``-\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u})``, dealiased | spectral, grid | no | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | not surviving, for the same reason as the row above |
@@ -419,10 +409,7 @@ iteration, and the criterion's return decides continuation. The accessors [`velo
 and [`scalar_physical`](@ref) return the
 deposited field, and [`max_speed`](@ref) the deposited number — each a checked read that throws when
 no deposit is current. The closing [`deposit!`](@ref) ends an iteration (the run layer's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) calls it
-after every step; the `Simulation` constructor makes the seeding deposit), and
-[`fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
-fields* being the two integrated fields — after which reads
-throw until an explicit `deposit!`. The accessor [`velocity_at_particles`](@ref) returns the velocity sampled at the
+after every step; the `Simulation` constructor makes the seeding deposit). The accessor [`velocity_at_particles`](@ref) returns the velocity sampled at the
 particle positions — a cached read like the fields' — and [`interpolate_at_particles!`](@ref) interpolates any physical field at the
 particle positions.
 

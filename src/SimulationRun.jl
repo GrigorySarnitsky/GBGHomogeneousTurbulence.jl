@@ -53,9 +53,7 @@ using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_fie
                           DealiasingStrategy, TwoThirds, max_resolved_wavenumber, _real_type
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!,
                   DEFAULT_PEAK_SHELL
-import ..Cache: particles_modified!, fields_modified!
 using ..Cache: ObservablesCache, check_deposits,
-               advance_fields_epoch!,
                velocity_physical, max_speed, velocity_at_particles
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
                      scalar_dissipation, energy_spectrum, derivative_skewness,
@@ -65,11 +63,10 @@ using ..Forcing: AbstractForcing, DeferredForcing, NoForcing, ConstantPower, Var
                  kinetic_energy_in_box_units, band_energy_fraction, _uncovered_reason, _stated_state,
                  _takes_design
 using ..Generator: FlowConditions, ResolvedGenerator, scalar_diffusivity
-using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
+using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!, deposit!,
                     recommended_cfl, IFLowStorageRK3
-import ..Propagator: deposit!
 using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
-                   restart!, history_depth, ParticleTraversal
+                   history_depth, ParticleTraversal
 import ..Particles: rebuild_traversal!
 
 export Simulation, advance!, run!, warmup!, StationarityCriterion,
@@ -974,16 +971,6 @@ end
 # drift from the first.
 
 
-function deposit!(sim::Simulation)
-  deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
-  # The velocity sample rides the same re-deposit: the positions are unchanged, so re-depositing
-  # from the freshly deposited velocity restores the values the announcement made stale.
-  sim.tracers === nothing ||
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache); traversal = sim.particle_traversal)
-  return sim
-end
-
-
 """
     current_time(sim)
 
@@ -995,14 +982,6 @@ current_time(sim::Simulation) = sim.clock.time
     current_step(sim)
 
 The number of steps `sim` has taken — how far the run has gone.
-
-Distinct from the observables cache's *epoch*, the version number of the state: a completed step
-raises it by one, and so does any state change announced
-with [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!). The constructor's
-deposit of the seeded fields already leaves their epoch at 1, so after two steps
-and one announced change the clock reads
-step 2 and the fields epoch reads 4. Use this to ask how far the run has gone, and the epoch to ask
-whether a cached value is still the right one.
 """
 current_step(sim::Simulation) = sim.clock.step
 
@@ -1161,7 +1140,7 @@ function advance!(sim::Simulation; dt = nothing)
     (traversal !== nothing && traversal.automatic) && rebuild_traversal!(traversal, sim.domain, sim.tracers)
     advect!(sim.particle_integration_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
             sim.particle_buffers, Δt; traversal)
-    # `advect!` announced the push itself (decision 76), so the previous sample already reads
+    # `advect!` advanced the particles epoch itself (decision 76), so the previous sample already reads
     # stale; the closing particle deposit refreshes it at the new positions.
     deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache); traversal)
   end
@@ -1185,62 +1164,6 @@ function advance!(sim::Simulation; dt = nothing)
   sim.clock.time += Δt
   sim.clock.step += 1
   return sim
-end
-
-
-# Pure forwarding: the cache does the whole job, including discarding the sample history it owns.
-# This exists so a caller holding a run need not reach through it to announce a reposition.
-function particles_modified!(sim::Simulation)
-  particles_modified!(sim.cache)
-  # Dispatch the scheme's own restart rather than relying on the cache's inline clear. They coincide
-  # today only because this scheme's history IS the cache's; a scheme carrying registers of its own
-  # would need them cleared here, and `Cache` — included before `Particles` — can never reach it.
-  sim.particle_buffers === nothing || restart!(sim.particle_integration_scheme, sim.particle_buffers)
-  # The unwrapped record restarts at the new positions: winding is a property of the trajectory
-  # just abandoned, and a record continued across a reposition would splice two unrelated paths.
-  sim.tracers === nothing || sim.tracers.unwrapped_positions === nothing ||
-    copyto!(point_positions(sim.tracers.unwrapped_positions), point_positions(sim.tracers.positions))
-  return sim
-end
-
-
-# The fields twin, for the same reason its particle counterpart exists: a replacement of the state
-# made outside the iteration invalidates the Lagrangian sample history a multistep particle integration scheme integrates over,
-# and the cache form is what discards it. Added because the particle form was and this one was not —
-# a caller holding a run should not have to know which of the two verbs happens to have the
-# convenience method.
-#
-# This form also SEES the state, so it is where the conjugate-symmetry contract is enforced (the
-# cache form cannot check what it cannot reach). The tolerance is scale-aware: hand-written partners
-# computed through different operation orders may disagree at roundoff, which is not a violation;
-# an O(1) inconsistency is. `reality_residual` sweeps only the folded axis's self-mirrored planes —
-# O(N²), and this verb is called outside the iteration, never in the hot loop.
-function fields_modified!(sim::Simulation)
-  _check_reality(sim.state.velocity_spectral, "velocity")
-  sim.state.scalar_spectral === nothing || _check_reality(sim.state.scalar_spectral, "scalar")
-  fields_modified!(sim.cache)
-  # Dispatch the scheme's own restart, exactly as the particles twin does: the cache form discards
-  # the sample history it owns, but a scheme carrying registers of its own would need them cleared
-  # here too, and `Cache` — included before `Particles` — can never reach it.
-  sim.particle_buffers === nothing || restart!(sim.particle_integration_scheme, sim.particle_buffers)
-  return sim
-end
-
-function _check_reality(field, name)
-  residual = reality_residual(field)
-  scale = maximum(abs, field_data(field))
-  T = field_scalar_type(field)
-  residual <= sqrt(eps(T)) * scale ||
-    throw(ArgumentError("fields_modified!: the $name coefficients are not the spectrum of a real " *
-                        "field — the conjugate-symmetry residual is $residual against a field scale " *
-                        "of $scale. On the real-to-complex layout the folded axis's zero plane (and " *
-                        "its Nyquist plane, for an even grid) stores both members of each " *
-                        "conjugate pair, so hand-written coefficients must satisfy " *
-                        "f̂(-κ) = conj(f̂(κ)) there; a violation makes every spectral diagnostic " *
-                        "silently disagree with the physical field. Repair with " *
-                        "`reality_projection!` — the field library's projector onto the nearest " *
-                        "real field's spectrum, one or two planes — or fix the write."))
-  return nothing
 end
 
 

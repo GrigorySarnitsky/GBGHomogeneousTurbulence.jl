@@ -12,14 +12,11 @@
 
 The observables cache — where the iteration leaves the observables it produces, so that the run's
 own components, and the caller between iterations, read them instead of computing them again. Each value is *deposited*, written together with its
-*epoch*: the version of the state it was computed from, a number raised by one each time a step
-completes or a change made outside the iteration is announced.
+*epoch*: the version of the state it was computed from, a number raised by one with each step and
+each tracer push.
 
 The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
-- [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a mutation of the state or
-  of the [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers) the run advects
-  made outside the iteration, so the affected slots go stale and reads throw until the next deposit.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
 - [`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed) — the cached largest flow speed,
@@ -35,19 +32,11 @@ rather than served stale.
 The solver's side of the contract is that `deposit!` fills every field-derived slot at the
 iteration's end (the velocity-at-particles slot is filled by the same generic's particle form,
 after the tracers advance) and sets
-its epoch. A caller reads through the accessors and deposits only to re-seed the cache after
-changing the state outside the iteration and announcing it (`fields_modified!`); the iteration's
-own deposits are the solver's.
+its epoch. A caller reads through the accessors, and deposits only when running the iteration by
+hand.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
 and a slot is readable exactly when its own epoch equals the counter it depends on.
-
-An epoch is not a step count: a completed
-[`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) advances the fields epoch, but so does any
-announced change made outside the iteration, so the two counts diverge. The epoch answers "is this value still the
-right one?"; the run's step counter
-[`current_step`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step) answers "how far has the run
-gone?".
 """
 module Cache
 
@@ -56,7 +45,7 @@ using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_fie
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-       velocity_at_particles, fields_modified!, particles_modified!
+       velocity_at_particles
 
 
 # Epoch sentinels. A slot's epoch is the fields epoch it was deposited at; the sentinels mark the
@@ -124,21 +113,17 @@ depends on.
 - `max_speed` — the cached fastest flow speed (a host number in the field's own element type).
 - `velocity_at_particles` — the velocity sampled at the particle positions, or `nothing` for a tracer-free run.
 - `velocity_at_particles_history` — the earlier Lagrangian samples, most recent first. A multistep
-  particle integration scheme integrates over these; an announced reposition invalidates them
-  together with the current sample.
+  particle integration scheme integrates over these.
 - `history_steps` — the step sizes the earlier samples were taken over.
 - `history_filled` — how many of the earlier samples are valid.
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
 - `velocity_at_particles_fields_epoch`, `velocity_at_particles_particles_epoch` — the velocity-at-particles slot's two epochs, against
   both counters, since that sample is a function of the state and the positions together.
-- `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
-  [`fields_modified!`](@ref), so it runs ahead of
-  [`current_step`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step). A
-  field-derived slot is readable exactly when its epoch equals this.
+- `fields_epoch` — the resolved fields' counter, advanced by every completed step. A field-derived
+  slot is readable exactly when its epoch equals this.
 - `particles_epoch` — the tracer positions' counter, advanced by every
-  [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) push — the push announces itself —
-  and by [`particles_modified!`](@ref) for a reposition made outside the push.
+  [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) push.
 """
 mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
   const velocity_physical::PV
@@ -146,8 +131,7 @@ mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
   const scalar_physical::PS
   const velocity_at_particles::TS
   # The earlier samples of the SAME observable, most recent first, with the step sizes they span.
-  # They live here, with the slot they extend, so that `particles_modified!` — which owns the epoch —
-  # can invalidate the whole history in one place. Held apart from the current slot rather than as a
+  # They live here, with the slot they extend. Held apart from the current slot rather than as a
   # ring including it, because the current slot is the tracer set's own storage, written in place.
   const velocity_at_particles_history::Vector{TS}
   const history_steps::Vector{Float64}
@@ -276,11 +260,7 @@ function velocity_at_particles(cache::ObservablesCache)
   cache.velocity_at_particles === nothing &&
     throw(ArgumentError("this run advects no tracers, so the cache has no velocity-at-particles slot"))
   # BOTH epochs, because the sample is a function of the state AND the positions — which is the whole
-  # reason the cache keeps two counters for this one slot. Testing only the fields epoch left the
-  # announced reposition, the very mutation the pair exists to catch, invisible to the read:
-  # `particles_modified!` advances the particles epoch and touches nothing else, so a sample measured
-  # along an abandoned trajectory was served as current, and `advance!`'s opening guard could never
-  # fire. `check_deposits` had the test right; this read did not.
+  # reason the cache keeps two counters for this one slot.
   (cache.velocity_at_particles_fields_epoch == cache.fields_epoch &&
    cache.velocity_at_particles_particles_epoch == cache.particles_epoch) ||
     error("the cached velocity at the particles is stale: the state or the tracer positions have advanced " *
@@ -339,96 +319,14 @@ function check_deposits(cache::ObservablesCache)
 end
 
 
-"""
-    fields_modified!(cache)
-    fields_modified!(sim)
-
-Announce that the resolved fields — ``\\hat{\\boldsymbol{u}}`` and ``\\hat\\varphi``, in spectral
-representation —
-were changed outside the iteration (a re-seeded velocity, any direct write to the state's storage).
-Advances the fields epoch of `cache` (an [`ObservablesCache`](@ref)), so every cached observable is stale and reads throw until
-the next deposit; that interval belongs to whoever made the change.
-
-This verb is only for changes made outside the iteration — [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!)
-advances the epoch itself, and the closing deposit restores the cache. After a hand-made mutation,
-re-deposit with the
-`Propagator`'s [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) before advancing again —
-the timestep choice reads the cached maximum speed.
-
-Coefficients written by hand must respect the real-field layout's conjugate symmetry — a violation
-makes spectral diagnostics silently disagree with the physical images. The `sim` form checks
-this: it measures the conjugate-symmetry residual on the planes that store both members of a pair
-and throws on an inconsistency beyond roundoff. The `cache` form cannot see the fields and trusts
-the caller; the package's own seeders satisfy the constraint by construction.
-
-Given a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) it announces the change
-to that run's cache — the form to reach for when a run is what you are holding
-(`particles_modified!` offers the same pair of forms).
-
-Returns its argument.
-
-!!! warning "It also discards the Lagrangian sample history"
-    Those samples are the velocity measured along the trajectory *through the state being
-    replaced*, so a multistep particle integration scheme integrating over them would blend the old field
-    into the new one. The run's own field advance is not such a change and keeps its history.
-"""
-fields_modified!(cache::ObservablesCache) =
-  (advance_fields_epoch!(cache); cache.history_filled = 0; cache)
-
-
-# The run's OWN field advance, which is not a replacement made outside the iteration and must not clear the sample
-# history: the samples it took are exactly what a multistep particle integration scheme integrates over next.
-# `step!` calls this at every stage, so clearing there would pin the scheme in its bootstrap forever
-# — the same trap the particles counterpart carries, and for the same reason: one verb was serving
-# both "the run advanced" and "someone replaced the state behind the run's back".
+# The run's field advance: `step!` calls this as the step completes, so every field-derived slot reads
+# as stale until the closing deposit. The Lagrangian sample history is untouched: the samples are
+# exactly what a multistep particle integration scheme integrates over next.
 advance_fields_epoch!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
 
-# Invalidating the sample history is the whole reason it lives in this cache: the samples in it were
-# taken along the trajectory that has just been abandoned, and a multistep scheme integrating over
-# them would blend the old path into the new one.
-"""
-    particles_modified!(cache)
-    particles_modified!(sim)
-
-Announce that the tracer positions were changed outside the iteration (a reseed, a hand-written
-correction, any direct write to the tracer storage) — the particle counterpart of
-[`fields_modified!`](@ref). Advances the particles epoch of `cache` (an [`ObservablesCache`](@ref)), so every
-trajectory-bound observable is stale and reads throw until the next deposit.
-
-It also discards the Lagrangian sample history this cache carries, so a multistep particle
-integration scheme starts over from the new positions rather than integrating across the abandoned path. That is
-why the history lives here and not in the scheme's own per-step buffers: the object that owns the epoch owns
-the invalidation. The run's own tracer advance is not such a change and keeps its history.
-
-The run's own tracer advance never needs this verb:
-[`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) moves the particles epoch itself and
-keeps the history — the advance *extends* the history this verb discards.
-
-A hand-run loop that repositions tracers itself calls this and then makes the particle deposit —
-`deposit!(cache, tracers, u)` — from the
-deposited velocity, so the slot is refilled at the new positions. A loop
-announcing to a bare cache rather than a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) must also call
-[`restart!`](@ref GBGHomogeneousTurbulence.Particles.restart!) itself, for a scheme carrying per-step
-buffers of its own
-([`ParticleIntegratorBuffers`](@ref GBGHomogeneousTurbulence.Particles.ParticleIntegratorBuffers)):
-the `Simulation` form calls that for you; the bare-cache form cannot dispatch to it.
-
-Given a `Simulation` it announces the change
-to that run's cache — the form to reach for when a run is what you are holding, mirroring
-[`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)'s own `sim` form.
-
-Returns its argument.
-"""
-particles_modified!(cache::ObservablesCache) =
-  (advance_particles_epoch!(cache); cache.history_filled = 0; cache)
-
-
-# The run's OWN tracer advance, which is not a change made outside the iteration and must not clear the sample
-# history: the samples it just took are exactly what a multistep scheme integrates over next. The two
-# were one verb until the history moved into this cache, at which point the difference stopped being
-# cosmetic — the routine path was clearing the history on every step and the multistep scheme could
-# never leave its bootstrap.
+# The run's tracer advance: every `advect!` push calls this, so the velocity-at-particles slot reads as
+# stale until the closing particle deposit. The sample history is untouched, as on the field side.
 advance_particles_epoch!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 
 

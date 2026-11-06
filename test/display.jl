@@ -264,14 +264,15 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     @test occursin("max_resolved_wavenumber", repl(domain))
     @test occursin("current", repl(sim.cache))
     @test occursin("0 of 2 past samples filled", repl(sim.cache))
-    fields_modified!(sim.cache)
+    Cache.advance_fields_epoch!(sim.cache)
     @test_throws ErrorException velocity_physical(sim.cache)   # the read refuses …
     @test occursin("stale", repl(sim.cache))                     # … and the display says so, without reading
-    deposit!(sim)
+    deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
     @test !occursin("stale", repl(sim.cache))
-    particles_modified!(sim.cache)
+    Cache.advance_particles_epoch!(sim.cache)
     @test occursin("tracer positions have advanced", repl(sim.cache))
-    deposit!(sim)
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
     @test occursin("never deposited", repl(ObservablesCache(domain)))
   end
 
