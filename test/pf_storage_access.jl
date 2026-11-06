@@ -16,6 +16,9 @@ const ALLOWED = Dict(
   ("src/SimulationDomain.jl", "fill!(field_data(f), zero(eltype(field_data(f))))") =>
     "PF 2026-09-28: PF's constructors return uninitialized memory and PF has no zeroing operation; " *
     "multiply!(f, 0, f) would keep a NaN",
+  ("src/SimulationRun.jl", "scale = maximum(abs, field_data(field))") =>
+    "PF 2026-09-28: reality_residual is in stored-coefficient units, so the largest stored coefficient " *
+    "is its yardstick; PF's `maximum` is physical-only",
   ("src/Forcing.jl", "randn!(ou.rng, field_data(slots.draws))") =>
     "PF 2026-09-28: the draw is made into a HOST field, so a seed gives the same realization on every " *
     "backend; adapt! then moves it",

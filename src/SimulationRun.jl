@@ -424,11 +424,10 @@ The run group, `kwargs...` in both signatures
   random seed, which is how a run continues from a stored or externally imported field. Its arrays
   become the run's own and are not copied, so two runs must not adopt one state object. Three rules
   apply to it:
-    - it must live on the domain's grid and storage backend, and agree with `scalar`;
-    - a forcing state it carries in its `modeled` entry — as a checkpoint of a
-      `StochasticOU` run does — continues where it
-      left off, while a forcing whose entry is empty starts a fresh one. An entry that does not fit
-      the forcing given is refused with an `ArgumentError`;
+    - it must live on the domain's grid and storage backend, agree with `scalar`, and hold the
+      spectrum of a real field; an `ArgumentError` refuses a violation or a mismatched forcing entry;
+    - a forcing state it carries in its `modeled` entry, as a `StochasticOU` checkpoint does,
+      continues where it left off, while a forcing whose entry is empty starts a fresh one;
     - with a derived ``\\nu``, the constructor measures the adopted state's kinetic energy and warns
       when it is far from the ``k`` of the run's stationary state. Adopting a state is also how a run
       starts from an energy other than the one it will hold.
@@ -773,6 +772,11 @@ function Simulation(domain::FixedDomain;
     state.velocity_spectral.fourier_coefficients isa domain.array_family ||
       throw(ArgumentError("the given `state` lives on a different storage backend than " *
                           "`domain`: move it, or build the domain, on the matching backend."))
+    # An imported or hand-built spectrum must be that of a real field. Nothing downstream would
+    # say so: the spectral diagnostics count an anti-Hermitian part the physical fields never see,
+    # and the first step's projection removes it, so the run would evolve a field it was not given.
+    _check_reality(state.velocity_spectral, "velocity")
+    state.scalar_spectral === nothing || _check_reality(state.scalar_spectral, "scalar")
   end
   # The tracking's settings travel as one value too; an adopted set must already live where the
   # run does, since its arrays become the run's own.
@@ -1164,6 +1168,28 @@ function advance!(sim::Simulation; dt = nothing)
   sim.clock.time += Δt
   sim.clock.step += 1
   return sim
+end
+
+
+# The tolerance is scale-aware: a spectrum produced by another solver's transform, or written through
+# a different order of operations, disagrees with its conjugate partner at roundoff, which is not a
+# violation; an O(1) inconsistency is. `reality_residual` sweeps only the folded axis's self-mirrored
+# planes — O(N²), once, at construction.
+function _check_reality(field, name)
+  residual = reality_residual(field)
+  scale = maximum(abs, field_data(field))
+  T = field_scalar_type(field)
+  residual <= sqrt(eps(T)) * scale ||
+    throw(ArgumentError("Simulation: the given `state`'s $name coefficients are not the spectrum " *
+                        "of a real field — the conjugate-symmetry residual is $residual against a " *
+                        "field scale of $scale. On the real-to-complex layout the folded axis's zero " *
+                        "plane (and its Nyquist plane, for an even grid) stores both members of each " *
+                        "conjugate pair, so the coefficients must satisfy f̂(-κ) = conj(f̂(κ)) there; " *
+                        "a violation makes every spectral diagnostic disagree with the physical " *
+                        "field, and the first step would project it away. Repair with " *
+                        "`reality_projection!` — the field library's projector onto the nearest " *
+                        "real field's spectrum — or fix the conversion that produced the coefficients."))
+  return nothing
 end
 
 
