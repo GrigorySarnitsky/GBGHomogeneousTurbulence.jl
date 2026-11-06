@@ -44,7 +44,7 @@ end
   seeded_velocity() = begin
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain, 1.0;
-                                         envelope_wavenumber = 2.0, rng = MersenneTwister(1))
+                                         envelope_shell = 2.0, rng = MersenneTwister(1))
     return û
   end
 

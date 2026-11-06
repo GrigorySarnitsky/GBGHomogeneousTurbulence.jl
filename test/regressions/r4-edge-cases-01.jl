@@ -59,7 +59,7 @@ end
   @test_throws ArgumentError VarianceRescaling(domain; target = -1.0, over = :band)
 
   state = ResolvedFields(domain)
-  random_solenoidal_velocity_spectral!(state.velocity_spectral, domain, 1.0; envelope_wavenumber = 2.0,
+  random_solenoidal_velocity_spectral!(state.velocity_spectral, domain, 1.0; envelope_shell = 2.0,
                                        rng = MersenneTwister(1))
   raised = try
     forcing = VarianceRescaling(domain; target = -1.0, over = :band)

@@ -17,7 +17,7 @@ using Random
   forcing = ConstantPower(domain; injection_rate = 0.1)
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain, 0.5;
-                                       envelope_wavenumber = 2.0, rng = MersenneTwister(5))
+                                       envelope_shell = 2.0, rng = MersenneTwister(5))
 
   # Empty the forced band by SUBTRACTION, then round-trip through physical representation — the
   # reachable route (a mask, a rescale, any physical-space processing): the subtraction alone is
@@ -36,7 +36,7 @@ using Random
   # A genuinely weak band still forces — and the decision is invariant under a uniform rescale.
   û2 = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û2, domain, 0.5;
-                                       envelope_wavenumber = 2.0, rng = MersenneTwister(6))
+                                       envelope_shell = 2.0, rng = MersenneTwister(6))
   for scale in (1.0, 1e-6)
     ûs = new_vector_field_spectral(domain)
     field_data(ûs) .= scale .* field_data(û2)

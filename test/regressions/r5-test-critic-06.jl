@@ -48,7 +48,7 @@ strip_band!(field, band) = convolve!(field, field, band, -1, 1)
   @testset ":total with the value outside the band above `target` empties the band" begin
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain, 0.5;
-                                         envelope_wavenumber = 8.0, rng = MersenneTwister(21))
+                                         envelope_shell = 8.0, rng = MersenneTwister(21))
     scratch = new_vector_field_spectral(domain)
     forcing = VarianceRescaling(domain; target = 1e-4, over = :total)   # far below the energy outside the band
 
@@ -69,7 +69,7 @@ strip_band!(field, band) = convolve!(field, field, band, -1, 1)
   @testset "the step after a zeroing leaves the (now empty) band alone" begin
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain, 0.5;
-                                         envelope_wavenumber = 8.0, rng = MersenneTwister(22))
+                                         envelope_shell = 8.0, rng = MersenneTwister(22))
     forcing = VarianceRescaling(domain; target = 1e-4, over = :total)
 
     project_forcing!(forcing, û, domain)                     # the zeroing step
@@ -81,7 +81,7 @@ strip_band!(field, band) = convolve!(field, field, band, -1, 1)
   @testset "an empty band is left untouched, not divided by ~0 (velocity, :band)" begin
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain, 0.5;
-                                         envelope_wavenumber = 8.0, rng = MersenneTwister(23))
+                                         envelope_shell = 8.0, rng = MersenneTwister(23))
     forcing = VarianceRescaling(domain; target = 0.7, over = :band)
     strip_band!(û, forcing.band)                           # exactly nothing left in the band
 
@@ -99,7 +99,7 @@ strip_band!(field, band) = convolve!(field, field, band, -1, 1)
   @testset "an empty band is left untouched under :total as well" begin
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain, 0.5;
-                                         envelope_wavenumber = 8.0, rng = MersenneTwister(24))
+                                         envelope_shell = 8.0, rng = MersenneTwister(24))
     forcing = VarianceRescaling(domain; target = 0.7, over = :total)
     strip_band!(û, forcing.band)
 
@@ -111,7 +111,7 @@ strip_band!(field, band) = convolve!(field, field, band, -1, 1)
 
   @testset "an empty band is left untouched (scalar, the factor-1 dispatch)" begin
     φ̂ = new_scalar_field_spectral(domain)
-    random_scalar_spectral!(φ̂, domain, 1.0; envelope_wavenumber = 8.0,
+    random_scalar_spectral!(φ̂, domain, 1.0; envelope_shell = 8.0,
                             rng = MersenneTwister(25))
     forcing = VarianceRescaling(domain; target = 0.5, over = :band)
     strip_band!(φ̂, forcing.band)
@@ -128,7 +128,7 @@ strip_band!(field, band) = convolve!(field, field, band, -1, 1)
   @testset "a zeroed velocity band keeps the field divergence-free" begin
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain, 0.5;
-                                         envelope_wavenumber = 8.0, rng = MersenneTwister(26))
+                                         envelope_shell = 8.0, rng = MersenneTwister(26))
     forcing = VarianceRescaling(domain; target = 1e-4, over = :total)
     project_forcing!(forcing, û, domain)
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)

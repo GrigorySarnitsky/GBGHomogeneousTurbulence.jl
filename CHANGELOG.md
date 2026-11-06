@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Breaking: the random seed's envelope is given in shells of the box's fundamental 2π/L, as
+  the forcing bands are. The keyword `envelope_wavenumber` of `Simulation`,
+  `random_solenoidal_velocity_spectral!` and `random_scalar_spectral!` is now `envelope_shell`,
+  default 2. On a box of side 2π the seed is unchanged; on any other box the default now
+  seeds shell 2, where it seeded the wrong shells before, or threw on a box much smaller than 1.
+
 ## 0.1.1 — 2026-11-02
 
 The two-peak scalar mixing example now includes a 512³ run and its video, GH200 Grace Hopper

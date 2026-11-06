@@ -513,7 +513,7 @@ module = "SimulationRun"
 [module]
 SimulationDomain = 25
 Observables = 21  # +1 (2026-10-16): `scalar_variance_and_dissipation`, the scalar twin of the fused velocity pair; +4 the same day: `integral_length(spectrum)`, `taylor_length`, `kolmogorov_time`, `kolmogorov_velocity` (decision 114)
-State = 6
+State = 7  # +1 (2026-11-06): `_envelope_wavenumber`, the seed's κ_p from its shell in units of 2π/L (decision 117)
 Cache = 23
 Forcing = 77  # +3 (2026-10-14): the deferred display's `_run_filled` (6) and `_either_or` (2) replace `_design_keyword` (5)
 Generator = 25

@@ -215,7 +215,7 @@ using Test
     domain = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain, 0.5; envelope_wavenumber = 2.0, rng = MersenneTwister(30))
+    random_solenoidal_velocity_spectral!(û, domain, 0.5; envelope_shell = 2.0, rng = MersenneTwister(30))
     truncate_to_band!(û, domain)
     S0 = derivative_skewness(û, domain)
     @test isfinite(S0) && abs(S0) < 0.15          # random-phase (Gaussian) field ⇒ S ≈ 0
@@ -252,7 +252,7 @@ using Test
                       element_type = Float64, array_family = Array)
     seeded = ResolvedFields(d16)
     random_solenoidal_velocity_spectral!(seeded.velocity_spectral, d16, 0.5;
-                                         envelope_wavenumber = 2.0, rng = MersenneTwister(40))
+                                         envelope_shell = 2.0, rng = MersenneTwister(40))
     sim = Simulation(d16; viscosity = 0.05,
                      velocity_forcing = VarianceRescaling(target = 0.8, over = :total), state = seeded)
     advance!(sim; dt = 0.01)
@@ -307,7 +307,7 @@ end
                       element_type = Float64, array_family = Array)
     seeded = ResolvedFields(d24)
     random_solenoidal_velocity_spectral!(seeded.velocity_spectral, d24, 0.4;
-                                         envelope_wavenumber = 2.0, rng = MersenneTwister(5))
+                                         envelope_shell = 2.0, rng = MersenneTwister(5))
     sim = Simulation(d24; viscosity = 0.05, state = seeded,
                      velocity_forcing = VarianceController(target = 1.5))
     û = sim.state.velocity_spectral

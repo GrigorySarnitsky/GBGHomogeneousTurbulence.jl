@@ -52,7 +52,7 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_resolved_wavenumber, _real_type
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!,
-                  DEFAULT_ENVELOPE_WAVENUMBER
+                  DEFAULT_ENVELOPE_SHELL
 import ..Cache: particles_modified!, fields_modified!
 using ..Cache: ObservablesCache, check_deposits,
                advance_fields_epoch!,
@@ -394,9 +394,9 @@ The run group, `kwargs...` in both signatures
   to fill. A target given to the forcing already gives the stationary state, so giving
   `kinetic_energy` or `dissipation` beside it is refused; under a derived ``\\nu``, a forcing that holds neither quantity draws the
   warning above.
-- `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the random
-  seed, for the velocity and the scalar alike (each shell-summed spectrum peaks at
-  ``\\kappa_p/\\sqrt{2}``). Keep ``\\kappa_p`` well below the dealias cutoff: a value near or above
+- `envelope_shell = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the random seed,
+  in units of the box's fundamental ``2\\pi/L`` as the forcing bands are, for the velocity and the
+  scalar alike (each shell-summed spectrum peaks at ``\\kappa_p/\\sqrt{2}``). Keep ``\\kappa_p`` well below the dealias cutoff: a value near or above
   it concentrates the seed, before its energy rescale, in shells the dealiasing holds empty, and the
   seeders warn when the envelope's peak reaches the cutoff. The seed's shape is deliberately the
   only one offered: the initial condition this package vouches for is the state the warm-up has
@@ -744,7 +744,7 @@ function Simulation(domain::FixedDomain;
                     field_integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
                     scalar::Union{Nothing, PassiveScalar} = nothing,
-                    envelope_wavenumber::Real = DEFAULT_ENVELOPE_WAVENUMBER,
+                    envelope_shell::Real = DEFAULT_ENVELOPE_SHELL,
                     state::Union{Nothing, ResolvedFields} = nothing,
                     particles::Union{Nothing, ParticleTracking} = nothing,
                     rng = Random.default_rng())
@@ -861,9 +861,9 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   if state === nothing
     state = ResolvedFields(domain; scalar = carries_scalar)
     random_solenoidal_velocity_spectral!(state.velocity_spectral, domain, k_design;
-                                         envelope_wavenumber, rng)
+                                         envelope_shell, rng)
     carries_scalar &&
-      random_scalar_spectral!(state.scalar_spectral, domain, scalar.variance; envelope_wavenumber, rng)
+      random_scalar_spectral!(state.scalar_spectral, domain, scalar.variance; envelope_shell, rng)
   end
   state = _with_forcing_states(state, conditions, domain)
   if carries_scalar

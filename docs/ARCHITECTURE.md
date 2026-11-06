@@ -3451,6 +3451,16 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     iteration, and the warm-up test's derivative skewness, read at every sample. A less frequent
     check would wait less. The owner kept both counted as
     unavoidable for now.
+117. **(2026-11-06, user-directed) The seed's envelope is given in shells: `envelope_shell`
+    replaces `envelope_wavenumber`.** The seed's characteristic wavenumber ``\kappa_p`` was an
+    absolute wavenumber whose default 2 was shell 2 only on ``L = 2\pi``. On ``L = 1`` the seed
+    sat in shell 1 alone, and on a 2 cm box the envelope underflowed on every mode and the seeder
+    threw. The forcing bands were already in shells of the fundamental ``2\pi/L``, so the seed was
+    the one large-scale input in other units. Now ``\kappa_p`` is `envelope_shell` times
+    ``2\pi/L`` on `Simulation` and both seeders, the default 2 seeds every box alike, and on
+    ``L = 2\pi`` the seed is unchanged bit for bit. The keyword was renamed rather than
+    reinterpreted, so a call that still passes `envelope_wavenumber` fails instead of seeding a
+    different field.
 
 ## References
 

@@ -178,7 +178,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # two guards at the deposit that closes every iteration.
     scalar_state = ResolvedFields(domain; scalar = true)
     random_solenoidal_velocity_spectral!(scalar_state.velocity_spectral, domain, 0.5;
-                                         envelope_wavenumber = 2.0, rng = MersenneTwister(1))
+                                         envelope_shell = 2.0, rng = MersenneTwister(1))
     scalar_buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     @test_throws ArgumentError deposit!(ObservablesCache(domain), scalar_state, domain, scalar_buffers)
     @test_throws ArgumentError deposit!(ObservablesCache(domain; scalar = true), scalar_state, domain,
