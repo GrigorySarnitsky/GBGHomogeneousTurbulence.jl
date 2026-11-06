@@ -569,7 +569,7 @@ end
 The stationary state a forced run on `domain` is predicted to settle in: the kinetic energy ``k``,
 the dissipation rate ``\\varepsilon``, the energy ``k_{\\mathrm{band}}`` held in the forced band, the
 viscosity ``\\nu`` and the two Reynolds numbers. It is what [`Simulation`](@ref) sets a run up for, so
-calling it first shows what a run will be given, and it serves a study that plans its runs. The
+calling it first shows what a run will be given. The
 prediction goes through the kinetic energy in box units — lengths in the box side ``L``,
 velocities in ``(\\varepsilon L)^{1/3}`` —
 ([`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units)),
@@ -589,14 +589,14 @@ the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3
 - `κ_max_η`, `viscosity` — at most one. A resolution ``\\kappa_{\\max}\\eta`` (default 2) fixes the
   Kolmogorov length ``\\eta``, hence ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, and ``\\nu`` follows
   from ``\\varepsilon`` as ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. A given `viscosity` is kept,
-  ``\\varepsilon`` is solved for within six decades of ``k^{3/2}/L``, and ``\\kappa_{\\max}\\eta`` follows.
+  ``\\varepsilon`` is solved for within a factor ``10^{6}`` of ``k^{3/2}/L``, and ``\\kappa_{\\max}\\eta`` follows.
 
 Returns a named tuple `(; kinetic_energy, dissipation, band_kinetic_energy, viscosity, reynolds_box,
 reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` in the domain's element type. A forcing the prediction does not
 cover (an unforced run, a forcing that forces no band of shells, a band that does not start at
 shell 1 or ends at shell 1) has no stationary state to predict,
 and it throws an `ArgumentError`, as does a stationary state given twice, both `κ_max_η` and
-`viscosity`, or a ``k`` that no ``\\varepsilon`` in those decades gives.
+`viscosity`, or a ``k`` that no such ``\\varepsilon`` gives.
 
 !!! warning "A prediction, not a measurement"
     The values rest on the model's placeholder ``\\tilde{k}`` and ``k_{\\mathrm{band}}/k``, which are
