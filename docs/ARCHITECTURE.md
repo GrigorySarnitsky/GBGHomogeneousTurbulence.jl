@@ -3463,6 +3463,19 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     ``L = 2\pi`` the seed is unchanged bit for bit. The keyword was renamed rather than
     reinterpreted, so a call that still passes `envelope_wavenumber` fails instead of seeding a
     different field.
+118. **(2026-11-06, user-directed) The run layer carries no threshold in the user's units, and a
+    run off the ``2\pi`` box is tested.** Two absolute constants sat in otherwise scale-free code.
+    The stationarity test called any series whose mean was below ``10^{-30}`` flat, and the
+    dissipation rate solved from a given ``\nu`` and ``k`` was searched in ``[10^{-30}, 10^{30}]``,
+    a root outside it coming back as the bracket's edge without an error. The flatness test is now
+    multiplied out, and the search spans six decades either side of ``k^{3/2}/L`` and refuses a
+    root outside them.
+
+    The suite now runs the package on a box of side 0.02 against the ``2\pi`` run rescaled by
+    dimension: the seed, the three dealiasing strategies, the forcings, the scalar, adaptive
+    steps, tracers, the observables, the prediction and a checkpoint. It is the counterpart of the
+    field library's anisotropic-box tests, with the scaling as the oracle where a run has no
+    closed form.
 
 ## References
 

@@ -596,6 +596,8 @@ reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` in the domain's elemen
 cover (an unforced run, a forcing that forces no band of shells, a band that does not start at
 shell 1 or ends at shell 1) has no stationary state to predict,
 and it throws an `ArgumentError`, as does a stationary state given twice or both `κ_max_η` and `viscosity`.
+With a given `viscosity` and ``k``, ``\\varepsilon`` is solved for within six decades of
+``k^{3/2}/L``, and a ``k`` the model reaches only outside them is refused the same way.
 
 !!! warning "A prediction, not a measurement"
     The values rest on the model's placeholder ``\\tilde{k}`` and ``k_{\\mathrm{band}}/k``, which are
@@ -654,9 +656,15 @@ function _predicted_stationary_state(domain::FixedDomain; velocity_forcing = Con
       ε = ε_stated
     else
       # k = k̃(Re_box(ε)) (εL)^{2/3}, solved for ε by bisection in log ε: the right side increases with
-      # ε whenever d ln k̃/d ln Re_box > −2, far beyond any measured slope.
+      # ε whenever d ln k̃/d ln Re_box > −2, far beyond any measured slope. The bracket is six decades
+      # either side of the dimensional estimate k^{3/2}/L, so it holds in every unit system, and a
+      # root outside it is refused rather than returned as the bracket's edge.
       energy(log_ε) = k̃_at(reynolds_box(L, exp(log_ε), ν)) * (exp(log_ε) * L)^(2 / 3)
-      low, high = log(1e-30), log(1e30)
+      estimate = log(k_stated^(3 / 2) / L)
+      low, high = estimate - 6 * log(10), estimate + 6 * log(10)
+      energy(low) <= k_stated <= energy(high) ||
+        throw(ArgumentError("no dissipation rate within six decades of k^{3/2}/L gives the stationary " *
+                            "kinetic energy k = $k_stated at ν = $ν; state `dissipation` instead"))
       for _ in 1:300
         middle = (low + high) / 2
         energy(middle) < k_stated ? (low = middle) : (high = middle)
@@ -1420,7 +1428,8 @@ StationarityMonitor(; min_turnovers, window_turnovers, tolerance, gate_scalar, g
                       Float64[], Float64[], Float64[], Float64[], false)
 
 # No net drift of the series y(turn) across the trailing window [now−W, now]:
-# |mean(2nd half) − mean(1st half)| / |mean| < tolerance.
+# |mean(2nd half) − mean(1st half)| ≤ tolerance·|mean|. Multiplied out rather than divided, it needs
+# no floor in the series' own units, and a series identically zero is flat.
 function _is_flat(turn, y, now, W, tolerance)
   mid = now - W / 2
   s1 = 0.0; n1 = 0; s2 = 0.0; n2 = 0
@@ -1434,8 +1443,7 @@ function _is_flat(turn, y, now, W, tolerance)
   end
   (n1 == 0 || n2 == 0) && return false
   mean_all = (s1 + s2) / (n1 + n2)
-  abs(mean_all) < 1e-30 && return true
-  return abs(s2 / n2 - s1 / n1) / abs(mean_all) < tolerance
+  return abs(s2 / n2 - s1 / n1) <= tolerance * abs(mean_all)
 end
 
 # Mean of the series `y(turn)` over the trailing window `[now-W, now]`.

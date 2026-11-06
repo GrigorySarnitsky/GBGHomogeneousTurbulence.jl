@@ -7,6 +7,9 @@
   `random_solenoidal_velocity_spectral!` and `random_scalar_spectral!` is now `envelope_shell`,
   default 2. On a box of side 2π the seed is unchanged; on any other box the default now
   seeds shell 2, where it seeded the wrong shells before, or threw on a box much smaller than 1.
+- With a given viscosity and kinetic energy, the predicted dissipation rate is no longer limited to
+  [1e-30, 1e30] in the user's units, a root outside which was returned as that limit without an
+  error. The warm-up's stationarity test no longer calls any series with a mean below 1e-30 flat.
 
 ## 0.1.1 — 2026-11-02
 
