@@ -10,7 +10,7 @@ using GBGHomogeneousTurbulence.Observables: vorticity_physical!
                        dealiasing = TwoThirds(), array_family = Array)
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain, 0.5;
-                                       envelope_shell = 2.0, rng = MersenneTwister(7))
+                                       peak_shell = 2.0, rng = MersenneTwister(7))
 
   scratch = new_vector_field_spectral(domain)
   u1, w1 = new_vector_field_physical(domain), new_vector_field_physical(domain)

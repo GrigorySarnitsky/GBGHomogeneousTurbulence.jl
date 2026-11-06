@@ -550,7 +550,7 @@ trace velocity correlation
 
 ```math
 \\begin{aligned}
-L_E &= \\frac{\\pi}{2} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa} \\\\
+L_{\\mathrm{E}} &= \\frac{\\pi}{2} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa} \\\\
     &= \\tfrac{2}{3}L_{11} = \\tfrac{1}{3}(L_{11} + 2L_{22}),
 \\end{aligned}
 ```

@@ -27,13 +27,13 @@ function step_deposit_bytes(; scalar::Bool, N, T = Float64)
 
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain, 0.6;
-                                       envelope_shell = 2.0, rng = MersenneTwister(42))
+                                       peak_shell = 2.0, rng = MersenneTwister(42))
   truncate_to_band!(û, domain)
   φ̂ = nothing
   if scalar
     φ̂ = new_scalar_field_spectral(domain)
     random_scalar_spectral!(φ̂, domain, 1.0;
-                            envelope_shell = 2.0, rng = MersenneTwister(43))
+                            peak_shell = 2.0, rng = MersenneTwister(43))
     truncate_to_band!(φ̂, domain)
   end
   state = ResolvedFields(û, φ̂)

@@ -42,24 +42,39 @@ using ..SimulationDomain: FixedDomain, max_retained_wavenumber, new_vector_field
 export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
 
 
-# The envelope's characteristic wavenumber κ_p from its shell. The seed is stated in units of the
-# box's fundamental 2π/L, as the forcing bands are, so it has one shape on every box: an absolute κ_p
-# was shell κ_p only on L = 2π, and on a 2 cm box exp(−κ²/κ_p²) underflowed on every mode.
-_envelope_wavenumber(domain, envelope_shell) = envelope_shell * (2π / domain.grid.domain_size[1])
+# The seed spectrum's peak wavenumber κ_p from its shell. The seed is stated in units of the box's
+# fundamental 2π/L, as the forcing bands are, so it has one shape on every box: an absolute κ_p
+# was shell κ_p only on L = 2π, and on a 2 cm box the envelope underflowed on every mode.
+_peak_wavenumber(domain, peak_shell) = peak_shell * (2π / domain.grid.domain_size[1])
 
 
-# The seeded spectrum peaks at κ_p/√2; a peak at or beyond the retained band's edge puts most of
-# the pre-rescale seed into shells the dealias mask holds empty — the energy rescale then inflates
-# what little survives, and the run starts from a field nothing like the envelope's shape. The
-# forcing-band warning's sibling (owner-ruled 2026-08-24).
-function _warn_envelope_beyond_cutoff(domain, envelope_shell)
+# A peak at or beyond the retained band's edge puts most of the pre-rescale seed into shells the
+# dealias mask holds empty — the energy rescale then inflates what little survives, and the run
+# starts from a field nothing like the envelope's shape. The forcing-band warning's sibling
+# (owner-ruled 2026-08-24).
+function _warn_peak_beyond_cutoff(domain, peak_shell)
   cutoff_shell = max_retained_wavenumber(domain) / (2π / domain.grid.domain_size[1])
-  peak_shell = envelope_shell / sqrt(2)
   peak_shell >= cutoff_shell &&
     @warn "the seed's spectrum peak, at shell $peak_shell, sits at or beyond the dealias cutoff " *
           "at shell $cutoff_shell: most of the drawn field lies in masked shells, and the energy " *
-          "rescale will amplify the retained residue. Lower `envelope_shell` well below the cutoff."
+          "rescale will amplify the retained residue. Lower `peak_shell` well below the cutoff."
   return nothing
+end
+
+
+# The amplitude envelope exp(−|κ|²/2κ_p²), a radial symbol of |κ|² built as a lazy kernel (no field
+# of coefficients). Its square times the shell's mode count, κ² exp(−κ²/κ_p²), peaks at κ_p. The
+# closure captures converted VALUES only — a captured `Type` is not a bitstype and a GPU launch
+# rejects it (PF's radial-kernel contract). The envelope vanishes at κ = 0, which IS the mean
+# removal: the κ = 0 coefficient of a field is its spatial mean, so killing that mode leaves a
+# mean-zero field with no physical-space pass. Without the guard the Gaussian is exp(0) = 1 there
+# and the velocity seed carries a uniform mean flow — measured at 13.5% of the seeded energy —
+# which is not homogeneous isotropic turbulence, inflates u' and the CFL speed, and sweeps every
+# tracer.
+function _seed_envelope(domain, peak_shell, ::Type{T}) where {T}
+  zero_value = zero(T)
+  rate = one(T) / (2 * T(_peak_wavenumber(domain, peak_shell))^2)
+  return radial_kernel(k2 -> ifelse(k2 > zero_value, exp(-rate * k2), zero_value), domain.multipliers)
 end
 
 
@@ -109,9 +124,11 @@ end
 
 const NO_FORCING_STATE = (velocity_forcing = nothing, scalar_forcing = nothing)
 
-# The seeders' default envelope shell, which `Simulation` forwards as its own default, so the two
-# cannot drift apart: it puts the seed spectrum's peak, at shell √2, on the largest scales.
-const DEFAULT_ENVELOPE_SHELL = 2.0
+# The seeders' default peak shell, which `Simulation` forwards as its own default, so the two cannot
+# drift apart. Shell 2 starts the seed near the stationary state of a band forced at shells 1–2: it
+# holds about 0.7 of its energy there (stationary: 0.53–0.77) and its L₁₁ is about 0.22 L (a model
+# stationary spectrum gives 0.16–0.23 L); a peak at shell √2 holds 0.94, with L₁₁ ≈ 0.29 L.
+const DEFAULT_PEAK_SHELL = 2.0
 
 ResolvedFields(velocity_spectral, scalar_spectral) =
   ResolvedFields(velocity_spectral, scalar_spectral, NO_FORCING_STATE)
@@ -157,7 +174,7 @@ end
 
 """
     random_solenoidal_velocity_spectral!(û, domain, kinetic_energy;
-                                         envelope_shell = 2.0, rng = default_rng())
+                                         peak_shell = 2.0, rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` concentrated at large scales, dealiased and rescaled so the kinetic energy
@@ -169,19 +186,17 @@ Fill `û` (a velocity field in spectral representation) with a random, divergenc
 - `û` — the velocity field in spectral representation to fill.
 - `domain` — the [`FixedDomain`](@ref) the field is generated on.
 - `kinetic_energy` — the kinetic energy the seeded field is rescaled to.
-- `envelope_shell = 2.0` — the Gaussian envelope's characteristic wavenumber ``\\kappa_p``, in
-  units of the box's fundamental ``2\\pi/L``: ``\\kappa_p`` is `envelope_shell` times ``2\\pi/L``.
+- `peak_shell = 2.0` — the wavenumber ``\\kappa_{\\mathrm{p}}`` at which the seed's spectrum peaks,
+  in units of the box's fundamental ``2\\pi/L``: ``\\kappa_{\\mathrm{p}}`` is `peak_shell` times ``2\\pi/L``.
 - `rng = default_rng()` — the random stream.
 
 The velocity is concentrated at large scales by a Gaussian envelope
-``\\exp\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
-amplitudes, zeroed at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}`` so the mean mode stays empty; its
-characteristic wavenumber is ``\\kappa_p``. Because the envelope multiplies the amplitudes, the
-shell-summed energy spectrum ``\\propto \\kappa^{2}\\exp\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)``
-peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's
-mode count). Keep ``\\kappa_p`` well below the dealias cutoff: a value near or above it puts most of the
-pre-rescale seed into shells the dealiasing truncation zeroes, and the seeder warns when the peak
-``\\kappa_p/\\sqrt{2}`` reaches the cutoff.
+``\\exp\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/(2\\kappa_{\\mathrm{p}}^{2})\\bigr)`` on the mode
+amplitudes, zeroed at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}`` so the mean mode stays empty. The
+shell-summed energy spectrum is then ``\\propto \\kappa^{2}\\exp\\bigl(-\\kappa^{2}/\\kappa_{\\mathrm{p}}^{2}\\bigr)``,
+the ``\\kappa^{2}`` being the shell's mode count, and peaks at ``\\kappa_{\\mathrm{p}}``. Keep
+``\\kappa_{\\mathrm{p}}`` well below the dealias cutoff: a peak near or above it puts most of the pre-rescale
+seed into shells the dealiasing truncation zeroes, and the seeder warns when it reaches the cutoff.
 
 The seed is a starting point for the warm-up, not an initial condition the package vouches for:
 the field a run begins measuring is the one its warm-up has brought to stationarity.
@@ -198,25 +213,14 @@ Returns `û`.
     interval between the two calls is yours to close.
 """
 function random_solenoidal_velocity_spectral!(û, domain::FixedDomain, kinetic_energy::Real;
-                                     envelope_shell::Real = DEFAULT_ENVELOPE_SHELL,
+                                     peak_shell::Real = DEFAULT_PEAK_SHELL,
                                      rng = Random.default_rng())
   T = _real_type(domain)
-  _warn_envelope_beyond_cutoff(domain, envelope_shell)
+  _warn_peak_beyond_cutoff(domain, peak_shell)
   noise = _host_noise(rng, T, domain, Val(1))
   to_spectral!(û, noise, domain.transform_plans)
 
-  # The envelope is a radial symbol of |κ|², built as a lazy kernel (no field of coefficients); the
-  # closure captures converted VALUES only — a captured `Type` is not a bitstype and a GPU launch
-  # rejects it (PF's radial-kernel contract).
-  # The envelope vanishes at κ = 0, which IS the mean removal: the κ = 0 coefficient of a field is
-  # its spatial mean, so killing that mode leaves ⟨u⟩ = 0 with no physical-space pass. Without the
-  # guard the Gaussian is exp(0) = 1 there and the seed carries a uniform mean flow — measured at
-  # 13.5% of the seeded energy — which is not homogeneous isotropic turbulence, inflates u' and the
-  # CFL speed, and sweeps every tracer. The scalar twin guards the same way.
-  zero_value = zero(T)
-  inverse_peak_squared = one(T) / T(_envelope_wavenumber(domain, envelope_shell))^2
-  envelope = radial_kernel(k2 -> ifelse(k2 > zero_value, exp(-inverse_peak_squared * k2), zero_value),
-                           domain.multipliers)
+  envelope = _seed_envelope(domain, peak_shell, T)
   # The truncation rides in the envelope rather than as a second sweep of the field: both are
   # per-mode scalar multipliers, and a scalar commutes through the (per-mode) Leray projection, so
   # composing them (radial∘radial collapses to one symbol) costs one field pass in total.
@@ -232,7 +236,7 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain, kinetic_e
   current_energy > 0 ||
     throw(ArgumentError("the seeded velocity has no energy to rescale: every mode was annihilated " *
                         "by the envelope and the dealiasing band together, so the requested " *
-                        "`kinetic_energy` cannot be realized. Keep `envelope_shell` above a few " *
+                        "`kinetic_energy` cannot be realized. Keep `peak_shell` above a few " *
                         "tenths of shell 1 and below the dealiasing cutoff, or raise the resolution."))
   multiply!(û, sqrt(T(kinetic_energy) / current_energy), û)
   return û
@@ -240,7 +244,7 @@ end
 
 
 """
-    random_scalar_spectral!(φ̂, domain, scalar_variance; envelope_shell = 2.0,
+    random_scalar_spectral!(φ̂, domain, scalar_variance; peak_shell = 2.0,
                             rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar
@@ -253,18 +257,16 @@ equals the requested `scalar_variance`. The mean vanishes by construction: the e
 - `φ̂` — the scalar field in spectral representation to fill.
 - `domain` — the [`FixedDomain`](@ref) the field is generated on.
 - `scalar_variance` — the variance the seeded field is rescaled to.
-- `envelope_shell = 2.0` — the Gaussian envelope's characteristic wavenumber ``\\kappa_p``, in
-  units of the box's fundamental ``2\\pi/L``: ``\\kappa_p`` is `envelope_shell` times ``2\\pi/L``.
+- `peak_shell = 2.0` — the wavenumber ``\\kappa_{\\mathrm{p}}`` at which the seed's spectrum peaks,
+  in units of the box's fundamental ``2\\pi/L``: ``\\kappa_{\\mathrm{p}}`` is `peak_shell` times ``2\\pi/L``.
 - `rng = default_rng()` — the random stream.
 
 The scalar is concentrated at large scales by a Gaussian envelope
-``\\exp\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
-amplitudes — zeroed, as above, at the origin — whose characteristic wavenumber is ``\\kappa_p``.
-Because the envelope multiplies the amplitudes, the shell-summed scalar-variance spectrum
-``\\propto \\kappa^{2}\\exp\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)`` peaks at ``\\kappa_p/\\sqrt{2}``,
-not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count). Keep ``\\kappa_p`` well
-below the dealias cutoff — a value near or above it puts most of the pre-rescale seed into shells
-the dealiasing truncation zeroes, and the seeder warns when the peak ``\\kappa_p/\\sqrt{2}`` reaches
+``\\exp\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/(2\\kappa_{\\mathrm{p}}^{2})\\bigr)`` on the mode
+amplitudes, zeroed at the origin as above. Its shell-summed variance spectrum
+``\\propto \\kappa^{2}\\exp\\bigl(-\\kappa^{2}/\\kappa_{\\mathrm{p}}^{2}\\bigr)`` then peaks at ``\\kappa_{\\mathrm{p}}``.
+Keep ``\\kappa_{\\mathrm{p}}`` well below the dealias cutoff: a peak near or above it puts most of the
+pre-rescale seed into shells the dealiasing truncation zeroes, and the seeder warns when it reaches
 the cutoff.
 
 As for the velocity, the seed is a starting point for the warm-up, not an initial condition the
@@ -282,28 +284,21 @@ Returns `φ̂`.
     interval between the two calls is yours to close.
 """
 function random_scalar_spectral!(φ̂, domain::FixedDomain, scalar_variance::Real;
-                        envelope_shell::Real = DEFAULT_ENVELOPE_SHELL,
+                        peak_shell::Real = DEFAULT_PEAK_SHELL,
                         rng = Random.default_rng())
   T = _real_type(domain)
-  _warn_envelope_beyond_cutoff(domain, envelope_shell)
+  _warn_peak_beyond_cutoff(domain, peak_shell)
   noise = _host_noise(rng, T, domain, Val(0))
   to_spectral!(φ̂, noise, domain.transform_plans)
 
-  # Radial-symbol envelope, as for the velocity: a lazy kernel, value-only captures.
-  # The envelope vanishes at κ = 0, which IS the mean removal: the κ = 0 coefficient of a field is
-  # its spatial mean, so killing that mode leaves ⟨φ⟩ = 0 without a physical-space pass or the
-  # reduction one would need to measure the mean.
-  zero_value = zero(T)
-  inverse_peak_squared = one(T) / T(_envelope_wavenumber(domain, envelope_shell))^2
-  envelope = radial_kernel(k2 -> ifelse(k2 > zero_value, exp(-inverse_peak_squared * k2), zero_value),
-                           domain.multipliers)
+  envelope = _seed_envelope(domain, peak_shell, T)                 # zero at κ = 0: ⟨φ⟩ = 0
   convolve!(φ̂, φ̂, convolve(envelope, domain.dealias))   # truncation folded in, as for the velocity
 
   current_variance = measure_scalar_variance(φ̂)          # ⟨φ²⟩ for a mean-zero field
   current_variance > 0 ||
     throw(ArgumentError("the seeded scalar has no variance to rescale: every mode was annihilated " *
                         "by the envelope and the dealiasing band together, so the requested " *
-                        "`scalar_variance` cannot be realized. Keep `envelope_shell` above a few " *
+                        "`scalar_variance` cannot be realized. Keep `peak_shell` above a few " *
                         "tenths of shell 1 and below the dealiasing cutoff, or raise the resolution."))
   multiply!(φ̂, sqrt(T(scalar_variance) / current_variance), φ̂)
   return φ̂

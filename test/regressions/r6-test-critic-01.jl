@@ -27,7 +27,7 @@ using Test
                        dealiasing = TwoThirds(), array_family = Array)
 
   φ̂ = new_scalar_field_spectral(domain)
-  random_scalar_spectral!(φ̂, domain, 0.4; envelope_shell = 2.0,
+  random_scalar_spectral!(φ̂, domain, 0.4; peak_shell = 2.0,
                           rng = MersenneTwister(7))
   truncate_to_band!(φ̂, domain)
 

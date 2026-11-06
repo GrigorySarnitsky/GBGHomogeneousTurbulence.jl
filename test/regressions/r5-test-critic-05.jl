@@ -3,12 +3,12 @@
 # Candidate: the "nothing left to rescale" guard in `State` — the `ArgumentError` raised when the
 # Gaussian envelope and the dealiasing band together annihilate every seeded mode — is reached by no
 # test in the suite, for either the velocity seeder (src/State.jl:145) or the scalar twin
-# (src/State.jl:220). Every existing call passes `envelope_shell = 2.0 … 4.0`, which keeps the
+# (src/State.jl:220). Every existing call passes `peak_shell = 2.0 … 4.0`, which keeps the
 # band populated, so a regression turning the guard into a silent 0/0 (a NaN field rescaled by
 # `sqrt(k/0)`) would pass the suite unnoticed.
 #
-# This asserts the CORRECT behaviour: with a characteristic wavenumber so small that
-# exp(-κ²/κ_p²) underflows to 0 at every κ > 0 — and with the κ = 0 mode already zeroed by
+# This asserts the CORRECT behaviour: with a peak wavenumber so small that
+# exp(-κ²/2κ_p²) underflows to 0 at every κ > 0 — and with the κ = 0 mode already zeroed by
 # construction — the seeders must REFUSE the request with a descriptive `ArgumentError`, never hand
 # back a zero or NaN-bearing field whose energy/variance is not the one asked for.
 
@@ -32,7 +32,7 @@ const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
     #  assert the observable consequence: the call must throw.)
     thrown = try
       random_solenoidal_velocity_spectral!(û, DOMAIN, 1.0;
-                                           envelope_shell = 1.0e-8,
+                                           peak_shell = 1.0e-8,
                                            rng = MersenneTwister(20260821))
       nothing
     catch err
@@ -40,7 +40,7 @@ const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
     end
     @test thrown isa ArgumentError
     # The message must name what the user can act on.
-    @test thrown isa ArgumentError && occursin("envelope_shell", sprint(showerror, thrown))
+    @test thrown isa ArgumentError && occursin("peak_shell", sprint(showerror, thrown))
     # And nothing NaN-bearing was written into the caller's field.
     @test !any(isnan, field_data(û))
   end
@@ -49,27 +49,27 @@ const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
     φ̂ = new_scalar_field_spectral(DOMAIN)
     thrown = try
       random_scalar_spectral!(φ̂, DOMAIN, 1.0;
-                              envelope_shell = 1.0e-8,
+                              peak_shell = 1.0e-8,
                               rng = MersenneTwister(20260822))
       nothing
     catch err
       err
     end
     @test thrown isa ArgumentError
-    @test thrown isa ArgumentError && occursin("envelope_shell", sprint(showerror, thrown))
+    @test thrown isa ArgumentError && occursin("peak_shell", sprint(showerror, thrown))
     @test !any(isnan, field_data(φ̂))
   end
 
   @testset "control: the guard has not over-fired on a normal seed" begin
     û = new_vector_field_spectral(DOMAIN)
     random_solenoidal_velocity_spectral!(û, DOMAIN, 0.5;
-                                         envelope_shell = 2.0,
+                                         peak_shell = 2.0,
                                          rng = MersenneTwister(1))
     @test kinetic_energy(û) ≈ 0.5
 
     φ̂ = new_scalar_field_spectral(DOMAIN)
     random_scalar_spectral!(φ̂, DOMAIN, 1.0;
-                            envelope_shell = 2.0, rng = MersenneTwister(2))
+                            peak_shell = 2.0, rng = MersenneTwister(2))
     @test scalar_variance(φ̂) ≈ 1.0
   end
 

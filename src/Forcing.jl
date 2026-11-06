@@ -196,13 +196,13 @@ run is set up for:
 - `VarianceRescaling(over = :band)` its `target`, from the predicted energy in the band
   ``k_{\\mathrm{band}}``;
 - `Linear` its `rate`, from ``A = \\varepsilon/(2 k_{\\mathrm{band}})``, the rate that injects ``\\varepsilon``;
-- `StochasticOU` its `forcing_variance`, from ``\\varepsilon/T_L`` — the variance whose injection
-  ``\\sigma^{2} T_L`` matches ``\\varepsilon`` while ``T_L`` is short.
+- `StochasticOU` its `forcing_variance`, from ``\\varepsilon/T_{\\mathrm{L}}`` — the variance whose injection
+  ``\\sigma^{2} T_{\\mathrm{L}}`` matches ``\\varepsilon`` while ``T_{\\mathrm{L}}`` is short.
 
 The stationary state, and ``k_{\\mathrm{band}}`` with it, is the one
 [`predicted_stationary_state`](@ref GBGHomogeneousTurbulence.SimulationRun.predicted_stationary_state)
 returns. The deferred `StochasticOU` may be given its correlation time in box units, as a multiple of
-``(L^{2}/\\varepsilon)^{1/3}``, which the run converts once into the constant time ``T_L`` the strategy
+``(L^{2}/\\varepsilon)^{1/3}``, which the run converts once into the constant time ``T_{\\mathrm{L}}`` the strategy
 holds; its `seed`, left out, is drawn from the run's `rng`. A scalar forcing takes only a
 whole-field target from the run, the scalar's `variance`, since no scalar stationary state
 is modelled; anything else it carries. Otherwise the keywords and defaults are those of the
@@ -1001,7 +1001,7 @@ end
     band_energy_fraction(forcing; reynolds_box = nothing, reynolds_taylor = nothing)
 
 The share of the kinetic energy a flow driven by `forcing` holds in its forced band, in its
-stationary state: ``k_{\\mathrm{band}}/k``, with ``k_{\\mathrm{band}} = \\tfrac{1}{2}\\sum_{\\text{band}}
+stationary state: ``k_{\\mathrm{band}}/k``, with ``k_{\\mathrm{band}} = \\tfrac{1}{2}\\sum_{\\mathrm{band}}
 \\lvert\\hat{\\boldsymbol{u}}\\rvert^{2}`` over the shells `lowest_shell` to `highest_shell`. A run uses it
 to set a strength defined through the band: the rate of [`Linear`](@ref),
 ``A = \\varepsilon/(2 k_{\\mathrm{band}})``, and the target of `VarianceRescaling(over = :band)`, which
@@ -1019,10 +1019,10 @@ Returns a `Float64`, and refuses what `kinetic_energy_in_box_units` refuses.
 
 !!! warning "Placeholder values"
     Until it is measured, the fraction is the inertial-range estimate: the energy
-    ``\\tfrac{3}{2}C_K \\varepsilon^{2/3}\\kappa_{\\mathrm{c}}^{-2/3}`` above the band's outer edge
+    ``\\tfrac{3}{2}C_{\\mathrm{K}} \\varepsilon^{2/3}\\kappa_{\\mathrm{c}}^{-2/3}`` above the band's outer edge
     ``\\kappa_{\\mathrm{c}} = (h + \\tfrac{1}{2}) 2\\pi/L``, with ``h`` the `highest_shell` and
-    ``C_K = 1.5``, subtracted from ``k``, so that
-    ``k_{\\mathrm{band}}/k = 1 - \\tfrac{3}{2}C_K/[\\tilde{k}(2\\pi(h + \\tfrac{1}{2}))^{2/3}]`` with
+    ``C_{\\mathrm{K}} = 1.5``, subtracted from ``k``, so that
+    ``k_{\\mathrm{band}}/k = 1 - \\tfrac{3}{2}C_{\\mathrm{K}}/[\\tilde{k}(2\\pi(h + \\tfrac{1}{2}))^{2/3}]`` with
     ``\\tilde{k}`` the placeholder kinetic energy in box units. It gives about 0.50 for shells 1–2 and
     0.57 for shells 1–4, and it
     does not depend on the Reynolds number.
@@ -1143,7 +1143,7 @@ units of the box's fundamental ``\\kappa_0 = 2\\pi/L``:
 ```
 
 where each amplitude ``\\boldsymbol{a}_{\\boldsymbol{\\kappa}}`` is an independent complex
-Ornstein–Uhlenbeck process with correlation time ``T_L``. When the forced field is the velocity, each
+Ornstein–Uhlenbeck process with correlation time ``T_{\\mathrm{L}}``. When the forced field is the velocity, each
 amplitude is drawn transverse to its own ``\\boldsymbol{\\kappa}``, so the force is divergence-free.
 The variance ``\\sigma^{2}`` is shared equally among the band's modes and their independent components.
 
@@ -1151,7 +1151,7 @@ Once per step every amplitude takes the process's exact transition over the step
 
 ```math
 \\boldsymbol{a}_{\\boldsymbol{\\kappa}} \\leftarrow \\alpha \\boldsymbol{a}_{\\boldsymbol{\\kappa}} + \\sqrt{1 - \\alpha^{2}} \\boldsymbol{\\xi}_{\\boldsymbol{\\kappa}},
-\\qquad \\alpha = e^{-\\Delta t / T_L},
+\\qquad \\alpha = e^{-\\Delta t / T_{\\mathrm{L}}},
 ```
 
 with ``\\boldsymbol{\\xi}`` a fresh draw from the stationary distribution, so the statistics are exact for
@@ -1159,26 +1159,26 @@ any step, a step the CFL condition varies included. The process starts from a st
 than from zero.
 
 How much energy that injects depends on how the force and the field line up. Over a correlation time
-the force builds the very velocity it then does work against, so while ``T_L`` is short against the
-large-eddy turnover time the mean injection rate is close to ``\\sigma^{2} T_L`` into the kinetic energy
-``k``, and to ``2\\sigma^{2} T_L`` into the scalar variance ``\\langle\\varphi^{2}\\rangle``. Both are
+the force builds the very velocity it then does work against, so while ``T_{\\mathrm{L}}`` is short against the
+large-eddy turnover time the mean injection rate is close to ``\\sigma^{2} T_{\\mathrm{L}}`` into the kinetic energy
+``k``, and to ``2\\sigma^{2} T_{\\mathrm{L}}`` into the scalar variance ``\\langle\\varphi^{2}\\rangle``. Both are
 estimates the run drifts around, not values anything holds: choose `forcing_variance` from the
 dissipation rate the run should sustain, and measure what it actually injects.
 
 The forcing is held fixed over a step and added at every stage, as [`add_forcing_source!`](@ref) does for
 every additive source. For a given sequence of amplitudes the field then advances at the scheme's
-order, but the forcing itself is resolved in time only step by step, so ``T_L`` should span many steps.
+order, but the forcing itself is resolved in time only step by step, so ``T_{\\mathrm{L}}`` should span many steps.
 
 # Arguments
 - `domain` — the `FixedDomain` of the run this forcing drives; without it the constructor returns
   the deferred form, a [`DeferredForcing`](@ref).
 - `forcing_variance` — the stationary mean square ``\\sigma^{2}`` of the added term, as above. A
-  deferred velocity forcing may leave it out, and the run then supplies ``\\varepsilon/T_L``, the
+  deferred velocity forcing may leave it out, and the run then supplies ``\\varepsilon/T_{\\mathrm{L}}``, the
   variance whose estimated injection matches its stationary ``\\varepsilon``.
-- `correlation_time` — the correlation time ``T_L`` of each amplitude. The deferred form takes
-  either it or `correlation_time_in_box_units`, a multiple ``\\tilde{T}_L`` of
+- `correlation_time` — the correlation time ``T_{\\mathrm{L}}`` of each amplitude. The deferred form takes
+  either it or `correlation_time_in_box_units`, a multiple ``\\tilde{T}_{\\mathrm{L}}`` of
   ``(L^{2}/\\varepsilon)^{1/3}`` that a run converts once into
-  ``T_L = \\tilde{T}_L (L^{2}/\\varepsilon)^{1/3}`` from its predicted ``\\varepsilon``; exactly one of
+  ``T_{\\mathrm{L}} = \\tilde{T}_{\\mathrm{L}} (L^{2}/\\varepsilon)^{1/3}`` from its predicted ``\\varepsilon``; exactly one of
   the two.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of ``\\kappa_0``;
   every mode of the band must lie inside the dealias cutoff, so the `Inf` the field-multiplying

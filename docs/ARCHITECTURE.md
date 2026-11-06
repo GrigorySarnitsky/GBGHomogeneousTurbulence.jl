@@ -637,13 +637,13 @@ docstring says so at the value.
 **Submodules are cut by representation, so they stay few** while the models multiply as subtypes:
 
 - **`Spectra`** — functions of ``\kappa`` (velocity ``E(\kappa)``, scalar ``E_\varphi(\kappa)``),
-  composed: an inertial core ``C_K \varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
+  composed: an inertial core ``C_{\mathrm{K}} \varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
   factor ``f_L(\kappa \ell)`` — each form evaluated at the length its own coefficient was fitted against — and dissipation-range factor ``f_\eta(\kappa\eta)``, a named preset fixing a
   published triple.
-- **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and, sharing the
+- **`StructureFunctions`** — functions of ``r`` (the ``D_{\mathrm{L}\dots}(r)`` laws and, sharing the
   representation, any two-point correlation law when one is added).
 - **`Scalings`** — the dimensionless numbers and their ``\mathrm{Re}_\lambda`` trends: the Kolmogorov
-  constant ``C_K`` (`Sreenivasan1995`) and the normalized dissipation constant ``C_\varepsilon``
+  constant ``C_{\mathrm{K}}`` (`Sreenivasan1995`) and the normalized dissipation constant ``C_\varepsilon``
   (`Sreenivasan1998`). The derivative skewness, the flatness, the
   Lagrangian ``C_0``, and the mechanical-to-scalar timescale ratio are forward-looking additions to the
   family, not yet built.
@@ -775,10 +775,10 @@ generalization is built for them until a second concrete case forces the abstrac
   four roles are already carved to receive it — but, per invariant 9, no generality is built until a second
   rung forces it. Each is discriminated from DNS by statistical commutation; the canonical acceptance test
   is the relaxation of a two-mode scalar distribution (a micromixing benchmark). The natural first
-  *spectral* rung is a Chollet–Lesieur eddy viscosity ``\nu_e(\kappa \mid \kappa_c)`` at the truncation
-  wavenumber ``\kappa_c`` (Chollet & Lesieur 1981) — architecturally a per-mode linear rate, a
+  *spectral* rung is a Chollet–Lesieur eddy viscosity ``\nu_{\mathrm{e}}(\kappa \mid \kappa_{\mathrm{c}})`` at the truncation
+  wavenumber ``\kappa_{\mathrm{c}}`` (Chollet & Lesieur 1981) — architecturally a per-mode linear rate, a
   negative linear-forcing citizen folded into the integrating factor as the steady rate of a `Linear` forcing
-  is, with the plateau–cusp profile resident and only its ``\sqrt{E(\kappa_c)/\kappa_c}`` scale updated
+  is, with the plateau–cusp profile resident and only its ``\sqrt{E(\kappa_{\mathrm{c}})/\kappa_{\mathrm{c}}}`` scale updated
   per step from one shell reduction. The Hou–Li filter at ``\nu = 0`` is its crude implicit sibling
   (numerical-dissipation LES), with the known cutoff-bottleneck caveat.
 - **The statistics bridge** — the sampling-to-`GBGStreamingStatistics` path (Eulerian field samples and
@@ -898,7 +898,7 @@ one usually encodes a decision.
 
 1. **No physical units.** Quantities are dimensionless, on the box's order-one reference scales;
    control is by ``\mathrm{Re}`` (through ``\nu``) and ``\mathrm{Sc}``, and the reference constants a run
-   is judged against — ``C_K``, ``C_\varepsilon``, and the kinetic energy in box units
+   is judged against — ``C_{\mathrm{K}}``, ``C_\varepsilon``, and the kinetic energy in box units
    ``\tilde{k} = k/(\varepsilon L)^{2/3}`` — are dimensionless groups.
 2. **No field or statistics machinery reimplemented.** Field operations come from `GBGPeriodicFields`,
    estimators from `GBGStreamingStatistics` (§5).
@@ -923,7 +923,7 @@ one usually encodes a decision.
    mandatory shell.
 8. **The scalar is denoted ``\varphi``**, never ``\theta`` — in code, mathematics, and prose.
    And it is an ``\mathrm{Sc} = O(1)`` scalar: no Batchelor-range machinery exists, the derived
-   viscosity resolves the velocity's cutoff rather than ``\eta_B = \eta/\sqrt{\mathrm{Sc}}``, and the
+   viscosity resolves the velocity's cutoff rather than ``\eta_{\mathrm{B}} = \eta/\sqrt{\mathrm{Sc}}``, and the
    constructor warns — never refuses — when the scalar is clearly under-resolved. High-Schmidt
    support is a deliberate absence, not an oversight.
 9. **Deferred futures are accounted for, not owed** (§7); no speculative extension points.
@@ -2048,10 +2048,10 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     the caveat cannot rot into a claim.
 
     The replacement is `VarianceController`, the constant-``k`` controller of Bassenne et al.
-    (2016, Eq. 20): ``A = [\varepsilon - G(k - k_\infty)/t_\ell]/(2k_f)`` — the whole field's
-    variance ``k`` in the restoring term, the forced band's ``k_f`` normalizing, and the two are not
+    (2016, Eq. 20): ``A = [\varepsilon - G(k - k_\infty)/t_\ell]/(2k_{\mathrm{f}})`` — the whole field's
+    variance ``k`` in the restoring term, the forced band's ``k_{\mathrm{f}}`` normalizing, and the two are not
     interchangeable (see the postscript). Its marginal term
-    ``\varepsilon/2k_f`` reinjects exactly what dissipation removes, and its proportional term gives
+    ``\varepsilon/2k_{\mathrm{f}}`` reinjects exactly what dissipation removes, and its proportional term gives
     ``\mathrm dk/\mathrm dt = -G(k - k_\infty)/t_\ell`` — exponential relaxation to a stable
     attractor. That is the structural difference from the rescale, not a numerical refinement: the
     clamp *imposes* the target and destroys the fluctuation of the quantity it holds, while the
@@ -2069,8 +2069,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     ``k_0 = 2.6`` toward ``1.5``), which a clamp cannot be said to do at all.
 
     **A postscript, because the round nearly shipped the wrong physics.** The first implementation
-    put the *band* variance in both places of that formula — normalizing by ``k_f`` (right) and
-    restoring toward ``k_f`` (wrong). Both readings are dimensionally sound and the code looked
+    put the *band* variance in both places of that formula — normalizing by ``k_{\mathrm{f}}`` (right) and
+    restoring toward ``k_{\mathrm{f}}`` (wrong). Both readings are dimensionally sound and the code looked
     symmetric, which is what made it survive review: it is a category error, not an arithmetic one,
     between the quantity a forcing *acts on* and the quantity it *holds*. The consequence was
     precise and invisible from the test suite — the run held the band at ``1.5`` and let ``k`` settle
@@ -2084,7 +2084,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 59. **(2026-08, user-directed) `gain = 0` is admitted: the bare marginal law is a valid forcing,
     and its physics is now stated correctly.** The constructor had refused it while the docstring
     described exactly that limit — and described it wrongly: "the variance random-walks" is false.
-    Expanded and then measured: with ``A = \varepsilon/2k_f`` the injection equals the instantaneous
+    Expanded and then measured: with ``A = \varepsilon/2k_{\mathrm{f}}`` the injection equals the instantaneous
     dissipation identically, so ``\mathrm dk/\mathrm dt = 0`` and ``k`` is *conserved at its initial
     value* (`target` never enters the rate). The subtlety is stability, not conservation: the exact
     reinjection cancels the cascade's own restoring response — the physical feedback `ConstantPower`'s
@@ -2568,7 +2568,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     registers — Carpenter & Kennedy (1994, NASA TM-109112) reach it in five stages of the same
     Williamson 2N-storage form. The scheme's stability function was derived exactly from the published
     rationals (the fifth coefficient collapses to ``z^{5}/200``), giving the imaginary-axis limit
-    ``y_s = \sqrt{5(\sqrt{2041}-5)/18} \approx 3.3407``, ``1.93\times`` RK3's ``\sqrt{3}`` at
+    ``y_{\mathrm{s}} = \sqrt{5(\sqrt{2041}-5)/18} \approx 3.3407``, ``1.93\times`` RK3's ``\sqrt{3}`` at
     ``5/3`` the evaluations. That gives ``\approx 16\%`` fewer transforms per unit time at the
     stability limit, and the gain was MEASURED at exactly that: step cost ``\times 1.665`` (vs ``5/3``
     analytic) on a ``128^3`` `Float64` GPU run, throughput ``\times 1.159`` vs the
@@ -2580,7 +2580,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     memory cells equal :RK3's in every configuration (stages, not registers — the equality is
     the claim), transform/pass cells `AUDIT_PRINT`-generated and frozen, the optimality floors
     reflective. Fourth-order convergence pinned by test (ratio ≈ 16); `recommended_cfl` prices
-    the larger ceiling (base 0.96, rounded down from ``0.5 \cdot y_s/\sqrt{3}``); checkpoint
+    the larger ceiling (base 0.96, rounded down from ``0.5 \cdot y_{\mathrm{s}}/\sqrt{3}``); checkpoint
     round-trips bitwise. A side effect worth naming: under a fourth-order field the existing
     `AdamsBashforth(order = 4)` tracers deliver genuine fourth-order trajectories, closing the
     order mismatch the particle suite's own test documents. *(Amended 2026-09-04: overstated.
@@ -2713,7 +2713,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     (and its Nyquist plane for an even axis). Their anti-Hermitian combination is invisible to the
     inverse real transform, so the nonlinear term — formed from the physical fields — neither sees
     nor feeds it; viscosity damps it at ``\nu\kappa^2``, next to nothing at ``\kappa \approx 1``;
-    and every forcing of the form ``\hat{\boldsymbol{N}} \mathrel{+}= A \chi_{\text{band}} \hat{\boldsymbol{u}}``, with ``\chi_{\text{band}}`` the band indicator,
+    and every forcing of the form ``\hat{\boldsymbol{N}} \mathrel{+}= A \chi_{\mathrm{band}} \hat{\boldsymbol{u}}``, with ``\chi_{\mathrm{band}}`` the band indicator,
     (`VarianceController`, `ConstantPower`, `Linear` through the integrating factor, `VarianceRescaling`
     through its rescale) amplifies it with the same ``A`` as the physical modes, which ``A`` must hold
     positive on average to balance ``\varepsilon``. Net growth ``A - \nu\kappa^2 \approx 0.26`` per
@@ -2833,21 +2833,21 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     satisfies the reality condition by construction), `to_spectral!`, the band kernel, and — for the
     velocity — `helmholtz_projection!`, then `combine!` for the exact transition
     ``\boldsymbol{a} \leftarrow \alpha\boldsymbol{a} + \sqrt{\sigma^{2}(1-\alpha^{2})} \boldsymbol{\xi}``,
-    ``\alpha = e^{-\Delta t/T_L}``, starting from a stationary draw. Every stage adds the process into
+    ``\alpha = e^{-\Delta t/T_{\mathrm{L}}}``, starting from a stationary draw. Every stage adds the process into
     the assembled term with the library's `embed_modes!` (its decision 85, requested and shipped
     2026-09-17/18), which writes only the shared modes, carries physical amplitudes across the
     resolution ratio, and never traverses the run's own field.
 
     The increment's scale is the expected variance of the masked, projected draw —
-    ``2M/N_c^{3}`` per unit variance for the velocity, ``M/N_c^{3}`` for the scalar, with ``M`` the
+    ``2M/N_{\mathrm{c}}^{3}`` per unit variance for the velocity, ``M/N_{\mathrm{c}}^{3}`` for the scalar, with ``M`` the
     band's lattice modes counted once at construction. The archived form divided by each draw's
     *realized* norm, which fixes every increment's size — not the independent Gaussian modes the method
     defines — and cost a device-to-host reduction every step. Measured at ``32^3``: the stationary mean
     square within 0.5 %, the lag-one correlation equal to ``\alpha`` to ``10^{-3}``, the mean square
     fluctuating as ``\chi^{2}`` over the retained degrees of freedom (the realized-norm form is pinned
     against), every mode's share equal within sampling error, and the mean injection rate 0.024 and
-    0.047 against the docstring's ``\sigma^{2} T_L`` of 0.025 and 0.050 (``T_L = 0.05, 0.1``), with
-    ``2\sigma^{2}T_L`` confirmed for the scalar variance.
+    0.047 against the docstring's ``\sigma^{2} T_{\mathrm{L}}`` of 0.025 and 0.050 (``T_{\mathrm{L}} = 0.05, 0.1``), with
+    ``2\sigma^{2}T_{\mathrm{L}}`` confirmed for the scalar variance.
 
     **Cost, measured on the RTX 5070 Ti at ``128^3`` `Float32`.** 2.68 ms per step — *faster* than the
     default `VarianceController`'s 3.22 ms, because the controller reads its band observable back to the
@@ -2936,7 +2936,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     The linear forcing a physical-space code applies acts on the whole field, and the only way to ask
     for it before was `highest_shell = N`, a number the user had to restate for every grid. With the
     band set to the whole field, `Linear` is Lundgren's forcing itself, `VarianceController` is
-    Bassenne et al.'s scheme in the physical-space form their title names (``k_f = k``),
+    Bassenne et al.'s scheme in the physical-space form their title names (``k_{\mathrm{f}} = k``),
     `ConstantPower` is the constant-injection variant, and `VarianceRescaling` is the whole-field
     rescale ``\boldsymbol{u} \leftarrow \boldsymbol{u}\sqrt{\texttt{target}/k}`` — verified mode
     by mode to round-off, and identical under `over = :band` and `:total`, which then coincide
@@ -3052,7 +3052,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     **Filling the forcing.** A deferred velocity forcing
     may leave its target out, and the run fills it from the state: `ConstantPower` its injection rate
     from ``\varepsilon``, `VarianceController` and `VarianceRescaling(over = :total)` their target from
-    ``k``, `StochasticOU` its variance from ``\varepsilon/T_L``. `DeferredForcing` therefore holds its
+    ``k``, `StochasticOU` its variance from ``\varepsilon/T_{\mathrm{L}}``. `DeferredForcing` therefore holds its
     strategy and keywords rather than an opaque closure, so the run can see what was stated. Three
     stay required. `Linear`'s rate would need the band's own energy, a model the ``G`` study must
     supply (the open item for the paper). `VarianceRescaling(over = :band)` holds that energy. A
@@ -3202,7 +3202,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     as a fraction of the box side. The companion Reynolds number is
     ``\mathrm{Re}_{\mathrm{box}} = \varepsilon^{1/3}L^{4/3}/\nu = 1/\tilde{\nu}``, written with ``\mathrm{box}`` rather
     than ``L``, because Pope's ``\mathrm{Re}_L`` is ``k^{2}/(\varepsilon\nu)``. The band energy fraction
-    is written ``k_f/k``, since ``f`` names the force. *(Superseded the same day by decision 103: the band
+    is written ``k_{\mathrm{f}}/k``, since ``f`` names the force. *(Superseded the same day by decision 103: the band
     energy is ``k_{\mathrm{band}}``, the fraction ``k_{\mathrm{band}}/k``.)*
 
     **Names, for the model to come:**
@@ -3220,12 +3220,12 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     rendering defect on the validation page: one passage carried doubled backslashes, pasted from a
     Julia string, so its math rendered as raw source.
 103. **(2026-09-29, user-directed) The energy in the forced band is ``k_{\mathrm{band}}``.** It had two
-    symbols: ``k_f`` in `VarianceController`'s docstring and ``E_{\mathrm{band}}`` in `ConstantPower`'s and on the
-    validation page. Neither was sound: ``k_f`` is the literature's forcing wavenumber and its ``f``
+    symbols: ``k_{\mathrm{f}}`` in `VarianceController`'s docstring and ``E_{\mathrm{band}}`` in `ConstantPower`'s and on the
+    validation page. Neither was sound: ``k_{\mathrm{f}}`` is the literature's forcing wavenumber and its ``f``
     names the force, and ``E`` is the spectral density ``E(\kappa)``, not an energy. ``k_{\mathrm{band}}`` reads as
     the kinetic energy ``k`` restricted to the band, matches the code's `band` kernels and
     `band_energy_fraction`, and makes the fraction ``k_{\mathrm{band}}/k``. It has a glossary row, and the
-    docstrings, comments, validation page and tests use it. Earlier log entries keep ``k_f`` as history.
+    docstrings, comments, validation page and tests use it. Earlier log entries keep ``k_{\mathrm{f}}`` as history.
 104. **(2026-09-29, user-directed) The two Reynolds numbers as plain functions of three scalars.**
     `reynolds_box(side_length, dissipation, viscosity)` gives ``\varepsilon^{1/3}L^{4/3}/\nu`` and
     `reynolds_taylor(kinetic_energy, dissipation, viscosity)` gives ``\sqrt{20/3} k/\sqrt{\varepsilon\nu}``.
@@ -3258,7 +3258,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `VarianceRescaling(over = :band)`'s target becomes optional, ``k_{\mathrm{band}}``, its fraction
     taken to be the one `over = :total` holds on the same band (a modelling assumption, testable by one
     run); the controller's omitted settling time is the predicted ``2k/(3\varepsilon)``; the deferred
-    `StochasticOU` states `correlation_time_in_box_units`, converted once to ``T_L``.
+    `StochasticOU` states `correlation_time_in_box_units`, converted once to ``T_{\mathrm{L}}``.
 
     **Uncovered runs**
     (owner's rulings): a derived ν for an unforced run or an uncovered band is an `ArgumentError`
@@ -3452,13 +3452,13 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     check would wait less. The owner kept both counted as
     unavoidable for now.
 117. **(2026-11-06, user-directed) The seed's envelope is given in shells: `envelope_shell`
-    replaces `envelope_wavenumber`.** The seed's characteristic wavenumber ``\kappa_p`` was an
+    replaces `envelope_wavenumber`.** The seed's characteristic wavenumber ``\kappa_{\mathrm{p}}`` was an
     absolute wavenumber whose default 2 was shell 2 only on ``L = 2\pi``. On ``L = 1`` the seed
     sat in shell 1 alone, and on a 2 cm box the envelope underflowed on every mode and the seeder
     threw. The forcing bands were already in shells of the fundamental ``2\pi/L``, so the seed was
     the one large-scale input in other units.
 
-    Now ``\kappa_p`` is `envelope_shell` times
+    Now ``\kappa_{\mathrm{p}}`` is `envelope_shell` times
     ``2\pi/L`` on `Simulation` and both seeders, the default 2 seeds every box alike, and on
     ``L = 2\pi`` the seed is unchanged bit for bit. The keyword was renamed rather than
     reinterpreted, so a call that still passes `envelope_wavenumber` fails instead of seeding a
@@ -3476,6 +3476,28 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     steps, tracers, the observables, the prediction and a checkpoint. It is the counterpart of the
     field library's anisotropic-box tests, with the scaling as the oracle where a run has no
     closed form.
+119. **(2026-11-06, user-directed) The seed is set by its spectrum's peak: `peak_shell` replaces
+    `envelope_shell`.** The amplitude envelope was
+    ``\exp\bigl(-\lvert\boldsymbol{\kappa}\rvert^{2}/\kappa_{\mathrm{p}}^{2}\bigr)``, so the
+    shell-summed spectrum peaked at ``\kappa_{\mathrm{p}}/\sqrt{2}``, and the default sat at shell
+    ``\sqrt{2}``. The envelope is now
+    ``\exp\bigl(-\lvert\boldsymbol{\kappa}\rvert^{2}/(2\kappa_{\mathrm{p}}^{2})\bigr)``, the
+    spectrum peaks at ``\kappa_{\mathrm{p}}``, and ``\kappa_{\mathrm{p}}`` is `peak_shell` times
+    ``2\pi/L``. `envelope_shell` was never released.
+
+    The default is 2, now the peak. A band forced at shells 1–2 holds 0.53–0.77 of the stationary
+    energy, as measured in the forcing study, and a model spectrum puts the integral length
+    ``L_{11}`` at about ``0.16L`` to ``0.23L``. The seed peaking at shell 2 holds 0.69 in the band, with
+    ``L_{11} \approx 0.22L``; the seed peaking at ``\sqrt{2}`` held 0.94, with ``0.29L``.
+120. **(2026-11-06, user-directed) A descriptive subscript is upright.** A subscript that stands
+    for a word is set in roman: ``\kappa_{\mathrm{p}}`` (peak), ``C_{\mathrm{K}}`` (Kolmogorov),
+    ``\eta_{\mathrm{B}}`` (Batchelor), ``\kappa_{\mathrm{c}}`` (cutoff), ``k_{\mathrm{band}}``. A
+    subscript that is itself a quantity, a variable or an index stays italic: ``C_\varepsilon``,
+    ``\tau_\eta``, ``t_n``, ``u_i``, ``C_S``, whose ``S`` is the skewness, and Pope's ``f_L``,
+    named for the length ``L``. This is
+    the convention of ISO 80000-1, which replaced ISO 31-0. Thirteen symbols were italic across the
+    docstrings, the pages and this document; all are now upright. The rulebook does not state the
+    convention yet, and it has been requested of GBGCodingTools; until it lands, nothing checks it.
 
 ## References
 
@@ -3503,7 +3525,7 @@ cites.
 - Cichowlas, C., Bonaïti, P., Debbasch, F. & Brachet, M. (2005). [*Effective dissipation and turbulence in spectrally truncated Euler flows*](https://doi.org/10.1103/PhysRevLett.95.264502). *Phys. Rev. Lett.* 95, 264502. *(Thermalization of the
   Galerkin-truncated conservative system; the ``\nu = 0`` oracle, §7.)*
 - Chollet, J.-P. & Lesieur, M. (1981). [*Parameterization of small scales of three-dimensional isotropic turbulence utilizing spectral closures*](https://doi.org/10.1175/1520-0469%281981%29038%3C2747:POSSOT%3E2.0.CO;2). *J. Atmos. Sci.* 38, 2747–2757. *(The spectral eddy
-  viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
+  viscosity ``\nu_{\mathrm{e}}(\kappa \mid \kappa_{\mathrm{c}})``; the deferred spectral large-eddy rung, §7.)*
 - Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* 16, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Lundgren, T. S. (2003). [*Linearly forced isotropic turbulence.*](https://web.stanford.edu/group/ctr/ResBriefs03/lundgren.pdf) *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*

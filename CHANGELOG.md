@@ -2,11 +2,11 @@
 
 ## Unreleased
 
-- Breaking: the random seed's envelope is given in shells of the box's fundamental 2π/L, as
-  the forcing bands are. The keyword `envelope_wavenumber` of `Simulation`,
-  `random_solenoidal_velocity_spectral!` and `random_scalar_spectral!` is now `envelope_shell`,
-  default 2. On a box of side 2π the seed is unchanged; on any other box the default now
-  seeds shell 2, where it seeded the wrong shells before, or threw on a box much smaller than 1.
+- Breaking: the random seed is set by the shell at which its spectrum peaks, in units of the box's
+  fundamental 2π/L. The keyword `envelope_wavenumber` of `Simulation`,
+  `random_solenoidal_velocity_spectral!` and `random_scalar_spectral!` is now `peak_shell`,
+  default 2. The old default peaked at shell √2 on a box of side 2π and in the wrong shells on any
+  other box, and it threw on a box much smaller than 1.
 - With a given viscosity and kinetic energy, the predicted dissipation rate is no longer limited to
   [1e-30, 1e30] in the user's units, a root outside which was returned as that limit without an
   error. The warm-up's stationarity test no longer calls any series with a mean below 1e-30 flat.

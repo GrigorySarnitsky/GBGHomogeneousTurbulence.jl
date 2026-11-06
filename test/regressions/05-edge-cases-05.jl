@@ -35,7 +35,7 @@ using GBGHomogeneousTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
     seeded = nothing
     warned = false
     try
-      seeded = random_solenoidal_velocity_spectral!(û, domain, requested; envelope_shell = 2.0,
+      seeded = random_solenoidal_velocity_spectral!(û, domain, requested; peak_shell = 2.0,
                           rng = MersenneTwister(1))
     catch err
       warned = true                                # an explicit error is acceptable behaviour

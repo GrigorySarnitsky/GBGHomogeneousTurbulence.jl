@@ -11,7 +11,7 @@ using Test, GBGHomogeneousTurbulence, Random
                        dealiasing = TwoThirds(), array_family = Array)
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain, 0.7;
-                                       envelope_shell = 2.0, rng = MersenneTwister(5))
+                                       peak_shell = 2.0, rng = MersenneTwister(5))
   κ, E = energy_spectrum(û, domain)
   Δκ = 2π / π                                   # the shell width on this box: 2, not 1
   @test isapprox(sum(E) * Δκ, kinetic_energy(û); rtol = 1e-12)   # k = Σ E(κₙ)·Δκ — the quadrature

@@ -66,7 +66,7 @@ const DOMAIN = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasi
 function measure(forcing, kind)
   û = new_vector_field_spectral(DOMAIN)
   random_solenoidal_velocity_spectral!(û, DOMAIN, 0.5;
-                                       envelope_shell = 2.0, rng = MersenneTwister(11))
+                                       peak_shell = 2.0, rng = MersenneTwister(11))
   field = CF(û)
   # BOTH sides are counted and BOTH are returned. `add_forcing_source!` accumulates into a DIFFERENT field
   # from the one it reduces, so `convolve!`'s counter lands on the output double — and a witness that

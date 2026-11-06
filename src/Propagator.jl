@@ -299,7 +299,7 @@ Use it when the run is stability-limited and the transforms dominate: its stabil
 ``R(z) = \\sum_{k \\le 4} z^{k}/k! + z^{5}/200``, whose imaginary-axis stability limit is
 
 ```math
-y_s = \\sqrt{\\tfrac{5(\\sqrt{2041} - 5)}{18}} \\approx 3.3407,
+y_{\\mathrm{s}} = \\sqrt{\\tfrac{5(\\sqrt{2041} - 5)}{18}} \\approx 3.3407,
 ```
 
 That limit is a factor ``1.93`` above the ``\\sqrt{3}`` of `IFLowStorageRK3`, and a step makes ``5/3``

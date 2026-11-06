@@ -32,7 +32,7 @@ mean_mode_of(sim) = mean_mode(sim.state.velocity_spectral)
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
     generator = ResolvedGenerator(domain, conditions)
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain, 1.5; envelope_shell = 4,
+    random_solenoidal_velocity_spectral!(û, domain, 1.5; peak_shell = 4,
                                          rng = MersenneTwister(1))
     u = new_vector_field_physical(domain)
     ω = new_vector_field_physical(domain)

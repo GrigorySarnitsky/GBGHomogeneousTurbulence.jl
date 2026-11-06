@@ -52,7 +52,7 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_resolved_wavenumber, _real_type
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!,
-                  DEFAULT_ENVELOPE_SHELL
+                  DEFAULT_PEAK_SHELL
 import ..Cache: particles_modified!, fields_modified!
 using ..Cache: ObservablesCache, check_deposits,
                advance_fields_epoch!,
@@ -94,10 +94,10 @@ with `scalar = nothing` carries none, and no scalar setting can be given to it.
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
   ``\\varkappa = \\nu/\\mathrm{Sc}``). The run's resolution criterion covers the velocity, not the
   scalar, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
-  ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
+  ``\\eta_{\\mathrm{B}} = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
   grid, with [`scalar_dissipation`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation)
   then measuring a truncated field. The package targets ``\\mathrm{Sc} = O(1)``, with no
-  Batchelor-range machinery. `Simulation` warns when the run's ``\\kappa_{\\max}\\eta_B`` falls
+  Batchelor-range machinery. `Simulation` warns when the run's ``\\kappa_{\\max}\\eta_{\\mathrm{B}}`` falls
   below the ``1.5`` well-resolved floor — in either viscosity mode, since the check reads the
   resolved ``\\nu`` however it was obtained — a warning, not an error, so a deliberately
   under-resolved scalar stays reachable but not silent; the remedy is `κ_max_η` raised by
@@ -394,11 +394,11 @@ The run group, `kwargs...` in both signatures
   to fill. A target given to the forcing already gives the stationary state, so giving
   `kinetic_energy` or `dissipation` beside it is refused; under a derived ``\\nu``, a forcing that holds neither quantity draws the
   warning above.
-- `envelope_shell = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the random seed,
+- `peak_shell = 2.0` — the wavenumber ``\\kappa_{\\mathrm{p}}`` at which the random seed's spectrum peaks,
   in units of the box's fundamental ``2\\pi/L`` as the forcing bands are, for the velocity and the
-  scalar alike (each shell-summed spectrum peaks at ``\\kappa_p/\\sqrt{2}``). Keep ``\\kappa_p`` well below the dealias cutoff: a value near or above
+  scalar alike. Keep ``\\kappa_{\\mathrm{p}}`` well below the dealias cutoff: a peak near or above
   it concentrates the seed, before its energy rescale, in shells the dealiasing holds empty, and the
-  seeders warn when the envelope's peak reaches the cutoff. The seed's shape is deliberately the
+  seeders warn when the peak reaches the cutoff. The seed's shape is deliberately the
   only one offered: the initial condition this package vouches for is the state the warm-up has
   brought to stationarity, not the seed, and a seed shaped to a reference spectrum is a research
   question of its own, outside this package.
@@ -751,7 +751,7 @@ function Simulation(domain::FixedDomain;
                     field_integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
                     scalar::Union{Nothing, PassiveScalar} = nothing,
-                    envelope_shell::Real = DEFAULT_ENVELOPE_SHELL,
+                    peak_shell::Real = DEFAULT_PEAK_SHELL,
                     state::Union{Nothing, ResolvedFields} = nothing,
                     particles::Union{Nothing, ParticleTracking} = nothing,
                     rng = Random.default_rng())
@@ -868,9 +868,9 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   if state === nothing
     state = ResolvedFields(domain; scalar = carries_scalar)
     random_solenoidal_velocity_spectral!(state.velocity_spectral, domain, k_design;
-                                         envelope_shell, rng)
+                                         peak_shell, rng)
     carries_scalar &&
-      random_scalar_spectral!(state.scalar_spectral, domain, scalar.variance; envelope_shell, rng)
+      random_scalar_spectral!(state.scalar_spectral, domain, scalar.variance; peak_shell, rng)
   end
   state = _with_forcing_states(state, conditions, domain)
   if carries_scalar

@@ -50,8 +50,8 @@ fixes the injection rate, ``\varepsilon`` is an *input*; the velocity scale ``u'
 
 ## Matching the smooth filter exactly
 
-Both codes damp each mode by ``\exp(-s (\kappa/\kappa_{M})^{36})``, but they normalize
-differently: TurTLE by ``\kappa_{M} = (N/2 - 1)`` (its highest mode with a nonzero conjugate
+Both codes damp each mode by ``\exp(-s (\kappa/\kappa_{\mathrm{M}})^{36})``, but they normalize
+differently: TurTLE by ``\kappa_{\mathrm{M}} = (N/2 - 1)`` (its highest mode with a nonzero conjugate
 partner), this package by the Nyquist ``N/2``. The two filters are made *identical to machine
 precision* by choosing this package's strength as
 

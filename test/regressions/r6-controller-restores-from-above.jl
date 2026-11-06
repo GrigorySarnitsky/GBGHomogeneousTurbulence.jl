@@ -18,7 +18,7 @@ using Random
     # state the run's stationary state twice (decision 95).
     seeded = ResolvedFields(domain)
     random_solenoidal_velocity_spectral!(seeded.velocity_spectral, domain, k0;
-                                         envelope_shell = 2.0, rng = MersenneTwister(seed))
+                                         peak_shell = 2.0, rng = MersenneTwister(seed))
     sim = Simulation(domain; viscosity = 0.05,
                      velocity_forcing = VarianceController(domain; target), state = seeded)
     for _ in 1:steps; advance!(sim); end

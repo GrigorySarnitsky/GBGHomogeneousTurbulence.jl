@@ -23,7 +23,7 @@ using Test
   generator = ResolvedGenerator(domain, conditions; scalar = true)
 
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û, domain, 0.6; envelope_shell = 2.0, rng = MersenneTwister(42))
+  random_solenoidal_velocity_spectral!(û, domain, 0.6; peak_shell = 2.0, rng = MersenneTwister(42))
   truncate_to_band!(û, domain)
   φ̂ = new_scalar_field_spectral(domain)                          # zero scalar (passive ⇒ stays zero)
   state = ResolvedFields(û, φ̂)
