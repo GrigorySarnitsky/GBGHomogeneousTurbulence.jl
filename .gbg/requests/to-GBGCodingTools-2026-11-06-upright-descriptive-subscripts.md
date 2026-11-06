@@ -1,8 +1,7 @@
 # To GBGCodingTools: a descriptive subscript is upright
 
-Status: approved by the owner on 2026-11-06, to be sent to the GBGCodingTools session when it is
-next online (it was offline when this was written). HT applied the convention the same day (HT
-decision 120).
+Status: approved by the owner on 2026-11-06 and sent to the GBGCodingTools session the same day.
+HT applied the convention the same day (HT decision 120).
 
 ## The convention
 
