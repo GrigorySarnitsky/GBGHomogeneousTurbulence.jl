@@ -84,7 +84,7 @@ functions of state); realization / infrastructure concerns are named by their jo
   reality condition on the self-conjugate planes (`reality_projection!`, decision 88 — a forcing
   proportional to the field amplifies its round-off violation until the flow dies).
 - `Particles` — Lagrangian particle tracking: the trajectory state (`Tracers`) held apart from the
-  pluggable trajectory integrator (`AbstractParticleIntegrator`: `EndpointHeun`, `AdamsBashforth`) and its per-scheme
+  pluggable trajectory integrator (`AbstractParticleIntegrator`: `Heun`, `AdamsBashforth`) and its per-scheme
   registers (`ParticleIntegratorBuffers`) — decision 50. *Particle* names anything true of the whole
   deferred ladder, *tracer* only the massless kind (decision 51).
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).
