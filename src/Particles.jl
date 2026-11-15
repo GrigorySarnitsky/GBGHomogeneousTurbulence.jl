@@ -531,8 +531,8 @@ Base.iterate(trail::ParticleTrail, offset::Int = firstindex(trail)) =
 
 # The weights of the derivatives of order 0 … `order` at zero of the polynomial through values at
 # the first `n` of `nodes`: `weights[j, m + 1]` multiplies the value at node `j` in the derivative
-# of order `m`. Fornberg's recursion (1988), which is stable on unevenly spaced nodes and costs
-# O(n² · order) host arithmetic.
+# of order `m`. Fornberg's recursion (1988), his relations (3.8) and (3.9) with the evaluation point
+# at zero; the nodes may be unevenly spaced, and the cost is O(n² · order) host arithmetic.
 function _derivative_weights!(weights::Matrix{Float64}, nodes::Vector{Float64}, n::Int, order::Int)
   fill!(weights, 0.0)
   weights[1, 1] = 1.0
@@ -594,8 +594,11 @@ longer trail.
   the call is an `ArgumentError`.
 - `order = 1` — the order ``m`` of the derivative; `0` copies the newest value.
 
-The weights are computed on the host from the samples' times, by Fornberg's recursion,
+The weights are computed on the host from the samples' times, by the recursion of Fornberg (1988),
 and the values are combined in one pass over the particles, without allocating at their scale.
+
+# References
+- Fornberg, B. (1988). [*Generation of finite difference formulas on arbitrarily spaced grids*](https://doi.org/10.1090/S0025-5718-1988-0935077-0). *Math. Comp.* 51(184), 699–706.
 """
 function time_derivative!(out::AbstractPointValues, trail::ParticleTrail; order::Integer = 1)
   order >= 0 || throw(ArgumentError("`order` must be non-negative, got $order"))
