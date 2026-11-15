@@ -3622,6 +3622,9 @@ cites.
   Adams–Bashforth tracer integration `AB` follows, decision 57.)*
 - Fornberg, B. (1988). [*Generation of finite difference formulas on arbitrarily spaced grids*](https://doi.org/10.1090/S0025-5718-1988-0935077-0). *Math. Comp.* 51(184), 699–706.
   *(The recursion that gives the weights of `time_derivative!` on unevenly spaced times.)*
+- Hairer, E., Nørsett, S. P. & Wanner, G. (1993). [*Solving Ordinary Differential Equations I: Nonstiff Problems.*](https://doi.org/10.1007/978-3-540-78862-1) 2nd ed., Springer.
+  *(The Adams methods and their predictor–corrector form, §III.1, with their orders, §III.2, and
+  their extension to variable steps, §III.5: `AB` and `ABM`.)*
 - Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* 6(4), 1612–1614.
   *(`VarianceRescaling`: the per-step rescaling of the low-``\kappa``
   modes to a fixed band energy. Kept as the reference implementation, with its first-order

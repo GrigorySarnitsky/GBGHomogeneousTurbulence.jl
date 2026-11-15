@@ -83,7 +83,7 @@ deposited samples of the velocity at the particles, one step of [`advect!`](@ref
 
 with positions wrapped into the box. The weights ``b_j`` integrate, over the step, the polynomial
 through the ``k`` samples, and ``\\beta^{*}``, ``\\beta_j`` the polynomial through those and
-``\\boldsymbol{f}^{*}``. They are recomputed every step from the samples' actual times, because the
+``\\boldsymbol{f}^{*}`` (Hairer, Nørsett & Wanner 1993). They are recomputed every step from the samples' actual times, because the
 run's timestep changes from one iteration to the next.
 
 Against `AB(k + 1)`, which has the same order and keeps the same number of samples, this scheme
@@ -97,6 +97,9 @@ an error of third order behind, and every step between the trail's samples is a 
 ``2k - 1`` iterations: a measurement that needs the full accuracy either discards those iterations or sets
 `shortened_first_steps` on
 [`ParticleTracking`](@ref GBGHomogeneousTurbulence.SimulationRun.ParticleTracking).
+
+# References
+- Hairer, E., Nørsett, S. P. & Wanner, G. (1993). [*Solving Ordinary Differential Equations I: Nonstiff Problems.*](https://doi.org/10.1007/978-3-540-78862-1) 2nd ed., Springer.
 
 # Fields
 The scheme stores no fields: `k` is carried as a type parameter.
@@ -182,7 +185,7 @@ One step of [`advect!`](@ref) is
 ```
 
 with the weights ``b_j`` re-solved each step by integrating, over the step, the polynomial through
-the samples at their actual times. The steps are not assumed uniform: the run's timestep changes
+the samples at their actual times (Hairer, Nørsett & Wanner 1993). The steps are not assumed uniform: the run's timestep changes
 every iteration, which classical fixed-step coefficients would silently get wrong.
 
 The run's trail of the velocity at the particles
@@ -213,6 +216,7 @@ strain can exceed the last two at an ordinary timestep. The corrected scheme of 
     *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010).
 
 # References
+- Hairer, E., Nørsett, S. P. & Wanner, G. (1993). [*Solving Ordinary Differential Equations I: Nonstiff Problems.*](https://doi.org/10.1007/978-3-540-78862-1) 2nd ed., Springer.
 - Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys. Commun.* 278, 108406.
 - Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2009.10.046). *J. Comput. Phys.* 229(17), 5862–5869.
 
