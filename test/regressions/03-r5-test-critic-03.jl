@@ -1,23 +1,25 @@
-# Witness for the claim: "`velocity_at_particles(cache)`'s two-epoch AND check is never driven to a
-# stale state by either epoch alone, so a regression flipping `&&` to `||`, or dropping either half,
-# would pass the whole suite."
+# Witness for the claim: "the checks on the cache's two counters are never driven to a failing state
+# by either counter alone, so a regression comparing the wrong counter, or dropping one where both
+# are meant, would pass the whole suite."
 #
-# The correct behaviour — the one this file asserts — is the contract the read's own docstring
-# states: the sample is current only when BOTH counters match its own, so a mutation of EITHER
-# factor alone must make the read throw. The two halves are exercised independently:
+# The correct behaviour — the one this file asserts — is that each check names the counters it
+# needs. The read of the trail of the velocity at the particles answers to the PARTICLES counter
+# alone, because a sample is u(t, X(t)) and only a move of the positions dates it. The particle step
+# needs the FIELDS exactly one step ahead of the positions. Each is exercised by moving one counter
+# alone:
 #
-#   (1) `advance_fields_epoch!(cache)` alone — the tracer positions are untouched, so
-#       `velocity_at_particles_particles_epoch == particles_epoch` still holds and only the fields half can fire;
-#   (2) `advance_particles_epoch!(cache)` alone — the fields are untouched, so
-#       `velocity_at_particles_fields_epoch == fields_epoch` still holds and only the particles half can fire.
+#   (1) `advance_fields_epoch!(cache)` alone — the positions are untouched, so the read is still
+#       served, while the particle step now finds the fields ahead and, without a field deposit, no
+#       current velocity to interpolate;
+#   (2) `advance_particles_epoch!(cache)` alone — the fields are untouched, and the read throws.
 #
-# Each case pins the *other* counter as still-matching before asserting the throw, which is what
-# makes the case discriminating: under `||` (or a dropped half) the surviving comparison would be
-# satisfied and the read would be served instead of throwing.
+# Each case pins the *other* counter as unmoved before asserting, which is what makes the case
+# discriminating. (Before 2026-11-15 the read compared both counters, and this witness pinned that.)
 
 using Test, Random
 using GBGHomogeneousTurbulence
-using GBGHomogeneousTurbulence.Cache: velocity_at_particles, advance_fields_epoch!, advance_particles_epoch!
+using GBGHomogeneousTurbulence.Cache: velocity_at_particles_trail, advance_fields_epoch!, advance_particles_epoch!
+using GBGPeriodicFields: npoints
 
 
 build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
@@ -25,34 +27,43 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
                      rng = MersenneTwister(20260821))
 
 
-@testset "each epoch alone drives the velocity-at-particles read stale" begin
+@testset "each counter alone moves exactly the checks that name it" begin
 
-  # ————— the control: a completed iteration leaves both counters current and the read served —————
+  # ————— the control: a completed iteration leaves the counters equal and the read served —————
   sim = build()
   advance!(sim; dt = 0.01)
-  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch
-  @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch
-  @test size(velocity_at_particles(sim.cache)) == (4, 3)
+  @test sim.cache.velocity_at_particles_epoch == sim.cache.particles_epoch == sim.cache.fields_epoch
+  @test npoints(velocity_at_particles_trail(sim.cache)[0].value) == 4
 
-  # ————— (1) the fields half alone —————
+  # ————— (1) the fields counter alone —————
   sim = build()
   advance!(sim; dt = 0.01)
+  particles_before = sim.cache.particles_epoch
   advance_fields_epoch!(sim.cache)
-  # the particles half is still satisfied, so only the fields comparison can raise the throw
-  @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch
-  @test sim.cache.velocity_at_particles_fields_epoch != sim.cache.fields_epoch
-  @test_throws ErrorException velocity_at_particles(sim.cache)
-
-  # ————— (2) the particles half alone —————
+  @test sim.cache.particles_epoch == particles_before            # the positions' counter did not move
+  @test sim.cache.fields_epoch == sim.cache.particles_epoch + 1
+  @test npoints(velocity_at_particles_trail(sim.cache)[0].value) == 4          # the read does not name the fields
+  # The particle step does: with the fields one step ahead it runs, once their velocity is deposited…
+  @test_throws ErrorException advect!(sim.particle_integration_scheme, sim.tracers, sim.domain, sim.cache, 0.01)
+  deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
+  @test advect!(sim.particle_integration_scheme, sim.tracers, sim.domain, sim.cache, 0.01) === sim.tracers
+  # …and with the fields two steps ahead it refuses.
   sim = build()
   advance!(sim; dt = 0.01)
-  advance_particles_epoch!(sim.cache)
-  # the fields half is still satisfied, so only the particles comparison can raise the throw
-  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch
-  @test sim.cache.velocity_at_particles_particles_epoch != sim.cache.particles_epoch
-  @test_throws ErrorException velocity_at_particles(sim.cache)
+  advance_fields_epoch!(sim.cache); advance_fields_epoch!(sim.cache)
+  deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
+  @test_throws ErrorException advect!(sim.particle_integration_scheme, sim.tracers, sim.domain, sim.cache, 0.01)
+  # With the fields not ahead at all it refuses as well.
+  sim = build()
+  advance!(sim; dt = 0.01)
+  @test_throws ErrorException advect!(sim.particle_integration_scheme, sim.tracers, sim.domain, sim.cache, 0.01)
 
-  # ————— and the particle deposit restores the read in the particles direction —————
-  deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-  @test size(velocity_at_particles(sim.cache)) == (4, 3)
+  # ————— (2) the particles counter alone —————
+  sim = build()
+  advance!(sim; dt = 0.01)
+  fields_before = sim.cache.fields_epoch
+  advance_particles_epoch!(sim.cache)
+  @test sim.cache.fields_epoch == fields_before                  # the fields' counter did not move
+  @test sim.cache.velocity_at_particles_epoch != sim.cache.particles_epoch
+  @test_throws ErrorException velocity_at_particles_trail(sim.cache)
 end

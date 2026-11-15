@@ -11,15 +11,19 @@ module GBGHomogeneousTurbulenceHDF5Ext
 using HDF5
 using GBGPeriodicFields: write_field, read_field, read_field!, write_points, read_points, write_scheme,
                          read_scheme, adapt!, field_grid, field_tensor_order,
-                         point_positions, point_values, npoints,
-                         PointSet
+                         npoints, point_value_tensor_order, PointSet
 using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, TwoThirds, HouLi, PhaseShift,
                                                _real_type
 import GBGHomogeneousTurbulence.SimulationDomain: write_domain, read_domain
 using GBGHomogeneousTurbulence.State: ResolvedFields
 import GBGHomogeneousTurbulence.State: write_state, read_state
-using GBGHomogeneousTurbulence.Particles: Tracers, Heun, AdamsBashforth, history_depth
-import GBGHomogeneousTurbulence.Particles: write_tracers, read_tracers
+using GBGHomogeneousTurbulence.Particles: Tracers, ParticleTrail, new_scalar_point_values,
+                                        new_vector_point_values, _capacity, _push!
+import GBGHomogeneousTurbulence.Particles: write_tracers, read_tracers, write_trail, read_trail
+using GBGHomogeneousTurbulence.ParticlePropagator: ABM, AB, _steps
+using GBGHomogeneousTurbulence.Cache: velocity_at_particles_trail, reset_velocity_at_particles!,
+                                    restore_velocity_at_particles!
+using GBGHomogeneousTurbulence.Propagator: deposit!
 using GBGHomogeneousTurbulence.Forcing: AbstractForcing, DeferredForcing, NoForcing, Linear,
                                       ConstantPower, VarianceRescaling, VarianceController,
                                       StochasticOU, StochasticOUState
@@ -28,7 +32,8 @@ using GBGHomogeneousTurbulence.Propagator: IFLowStorageRK3, IFLowStorageRK4, IFS
 using GBGHomogeneousTurbulence.SimulationRun: Simulation, PassiveScalar, ParticleTracking
 import GBGHomogeneousTurbulence.SimulationRun: write_simulation, read_simulation
 
-const SCHEMA_VERSION = 2
+# Version 3 (0.3): the velocity at the particles is stored as a trail, each sample with its time.
+const SCHEMA_VERSION = 3
 
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
@@ -88,15 +93,19 @@ function _load_field!(dest, g, name::AbstractString, who::String)
   return dest
 end
 
-# Read a stored point object's (M, 3) coordinates onto the domain's backend as a fresh PointSet.
+# Move a stored point set onto the domain's backend, as a fresh PointSet of the domain's element type.
+# The field library's typed copy does the moving, and refuses a change of precision with its reason.
 function _points_on_backend(domain::FixedDomain, host_points)
   T = _real_type(domain)
-  X_host = point_positions(host_points)
-  eltype(X_host) == T || throw(ArgumentError(
-    "the stored positions have element type $(eltype(X_host)), but the domain builds $T"))
-  X = domain.array_family{T}(undef, size(X_host)...)
-  copyto!(X, X_host)
-  return PointSet(X)
+  points = PointSet(domain.array_family{T}(undef, npoints(host_points), 3))
+  try
+    adapt!(points, host_points)
+  catch refusal
+    refusal isa ArgumentError || rethrow()
+    throw(ArgumentError("the stored positions cannot be moved onto the domain, whose element type " *
+                        "is $T. $(refusal.msg)"))
+  end
+  return points
 end
 
 
@@ -234,6 +243,61 @@ end
 
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
+# A trail: its capacity, the tensor order of its values, and the samples it holds from the oldest to
+# the newest — each value through the field library's point persistence, the times as one attribute.
+# `skip_newest` serves the checkpoint, whose newest sample is recomputed on read.
+
+function _write_trail(parent, name::AbstractString, trail::ParticleTrail; skip_newest::Bool = false)
+  g = create_group(parent, name)
+  a = attrs(g)
+  a["type"] = "GBGHomogeneousTurbulence.ParticleTrail"
+  a["version"] = SCHEMA_VERSION
+  a["capacity"] = _capacity(trail)
+  a["tensor_order"] = point_value_tensor_order(trail.values[1])
+  stored = collect(trail)[1:(length(trail) - (skip_newest && !isempty(trail) ? 1 : 0))]
+  a["times"] = Float64[sample.time for sample in stored]
+  for (j, sample) in enumerate(stored)
+    write_points(g, "sample$j", sample.value)
+  end
+  return g
+end
+
+write_trail(parent::HDF5.H5DataStore, name::AbstractString, trail::ParticleTrail) =
+  _write_trail(parent, name, trail)
+
+# Put each stored sample back through `add_sample!(fill!, t)`, oldest first; the values are moved
+# onto the destination's backend by the field library's typed copy, which refuses a mismatch in
+# count, element type or tensor order with its reason.
+function _restore_samples!(add_sample!, g, who::String)
+  times = attrs(g)["times"]
+  for (j, t) in enumerate(times)
+    stored = read_points(g, "sample$j")
+    try
+      add_sample!(value -> adapt!(value, stored), t)
+    catch refusal
+      refusal isa Union{ArgumentError, DimensionMismatch} || rethrow()
+      throw(ArgumentError("$who: the stored sample $j does not fit the trail it is read into. " *
+                          sprint(showerror, refusal)))
+    end
+  end
+  return nothing
+end
+
+function read_trail(parent::HDF5.H5DataStore, name::AbstractString, tracers::Tracers)
+  g = _require_group(parent, name, "read_trail")
+  a = _require_tag(g, name, "read_trail", "GBGHomogeneousTurbulence.ParticleTrail")
+  order = Int(a["tensor_order"])
+  allocator = order == 0 ? new_scalar_point_values :
+              order == 1 ? new_vector_point_values :
+              throw(ArgumentError("read_trail: group \"$name\" stores values of tensor order " *
+                                  "$order, and a trail holds scalars or vectors"))
+  trail = ParticleTrail(allocator, tracers, Int(a["capacity"]))
+  _restore_samples!((fill!, t) -> _push!(fill!, trail, t), g, "read_trail")
+  return trail
+end
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
 # The forcings: a strategy IS its parameters (the shell bounds included, stored on the struct for
 # exactly this reason); the band kernel is rebuilt by the ordinary constructor. The
 # stochastic forcing's process is state, not a parameter: it is stored with the run's state.
@@ -349,15 +413,15 @@ end
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # The checkpoint: composition of the pairs above, plus the three things only the run layer holds —
-# the scheme and timestep settings (attributes), the Lagrangian sample history (the one cache
-# content a restart cannot recompute), and the clock.
+# the scheme and timestep settings (attributes), the earlier samples of the velocity at the
+# particles (the one cache content a restart cannot recompute), and the clock.
 
 _field_scheme_tag(::IFLowStorageRK3) = "IFLowStorageRK3"
 _field_scheme_tag(::IFHeun) = "IFHeun"
 _field_scheme_tag(::IFSSPRK3) = "IFSSPRK3"
 _field_scheme_tag(::IFLowStorageRK4) = "IFLowStorageRK4"
-_particle_scheme_tag(::Heun) = "Heun"
-_particle_scheme_tag(::AdamsBashforth) = "AdamsBashforth"
+_particle_scheme_tag(::ABM) = "ABM"
+_particle_scheme_tag(::AB) = "AB"
 
 function write_simulation(parent::HDF5.H5DataStore, name::AbstractString, sim::Simulation)
   g = create_group(parent, name)
@@ -380,17 +444,13 @@ function write_simulation(parent::HDF5.H5DataStore, name::AbstractString, sim::S
   write_forcing(g, "scalar_forcing", conditions.scalar_forcing)
   if sim.tracers !== nothing
     a["particle_integration_scheme"] = _particle_scheme_tag(sim.particle_integration_scheme)
-    a["particle_scheme_order"] = history_depth(sim.particle_integration_scheme)
+    a["particle_scheme_steps"] = _steps(sim.particle_integration_scheme)
+    a["shortened_first_steps"] = sim.shortened_first_steps
     write_tracers(g, "tracers", sim.tracers)
-    filled = sim.cache.history_filled
-    a["history_filled"] = filled
-    if filled > 0
-      a["history_steps"] = collect(sim.cache.history_steps[1:filled])
-      hg = create_group(g, "sample_history")
-      for j in 1:filled
-        write_points(hg, "row$j", sim.cache.velocity_at_particles_history[j])
-      end
-    end
+    # The newest sample is the velocity at the stored positions, which the restored run measures
+    # again; the earlier ones cannot be recomputed and are stored, with their times.
+    _write_trail(g, "velocity_at_particles_trail", velocity_at_particles_trail(sim.cache);
+                 skip_newest = true)
   end
   return g
 end
@@ -426,14 +486,23 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
   if has_tracers
     # The stored set is read onto the run's backend and ADOPTED, positions and unwrapped record
     # alike, so nothing is seeded only to be overwritten.
+    # A checkpoint written before version 0.3 stored its samples without their times, so the run
+    # cannot be continued from it as it was; restarting the trail silently would change the
+    # trajectories against the uninterrupted run.
+    haskey(g, "velocity_at_particles_trail") ||
+      throw(ArgumentError("read_simulation: group \"$name\" carries tracers and was written " *
+                          "before version 0.3, without the times of its velocity samples, so " *
+                          "the run cannot be continued from it. Read its state and tracers with " *
+                          "`read_state` and `read_tracers`, and build a new `Simulation` from them."))
     ptag = a["particle_integration_scheme"]
     particle_integration_scheme =
-      ptag == "Heun" ? Heun() :
-      ptag == "AdamsBashforth" ? AdamsBashforth(order = Int(a["particle_scheme_order"])) :
+      ptag == "ABM" ? ABM(Int(a["particle_scheme_steps"])) :
+      ptag == "AB" ? AB(Int(a["particle_scheme_steps"])) :
       throw(ArgumentError("read_simulation: unrecognized particle scheme tag \"$ptag\" in " *
                           "group \"$name\""))
     particles = ParticleTracking(read_tracers(g, "tracers", domain);
-                                 particle_integration_scheme, traversal_mode)
+                                 particle_integration_scheme, traversal_mode,
+                                 shortened_first_steps = Bool(a["shortened_first_steps"]))
   else
     # A traversal setting on a tracer-free file has nothing to apply to, and is refused by name
     # rather than silently dropped; the default is the one value that asks for nothing.
@@ -458,22 +527,20 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
     adapt!(current.process, stored.process)
     current.draws = stored.draws
   end
-  # The constructor's deposits measured the adopted state and tracers; the stored sample history is
-  # restored after them.
-  if has_tracers && haskey(g, "sample_history")
-    hg = _require_group(g, "sample_history", "read_simulation")
-    steps = a["history_steps"]
-    depth = length(sim.cache.velocity_at_particles_history)
-    n = min(Int(a["history_filled"]), depth)
-    for j in 1:n
-      row = read_points(hg, "row$j")
-      copyto!(point_values(sim.cache.velocity_at_particles_history[j]), point_values(row))
-      sim.cache.history_steps[j] = steps[j]
-    end
-    sim.cache.history_filled = n
-  end
   sim.clock.time = a["time"]
   sim.clock.step = Int(a["step"])
+  # The constructor started a new trail at time zero. The stored one takes its place: the earlier
+  # samples go back in time order, and the ordinary particle deposit then measures the newest again
+  # at the stored positions, labelled with the stored clock.
+  if has_tracers
+    tg = _require_group(g, "velocity_at_particles_trail", "read_simulation")
+    _require_tag(tg, "velocity_at_particles_trail", "read_simulation",
+                 "GBGHomogeneousTurbulence.ParticleTrail")
+    reset_velocity_at_particles!(sim.cache)
+    _restore_samples!((fill!, t) -> restore_velocity_at_particles!(fill!, sim.cache, t), tg,
+                      "read_simulation")
+    deposit!(sim.cache, sim.tracers, sim.clock.time; traversal = sim.particle_traversal)
+  end
   return sim
 end
 
@@ -482,8 +549,8 @@ end
 # concrete parent types keep these strictly more specific than HDF5's own dataset-writing
 # `setindex!`, never ambiguous with it.
 for (T, writer) in ((:FixedDomain, :write_domain), (:ResolvedFields, :write_state),
-                    (:Tracers, :write_tracers), (:AbstractForcing, :write_forcing),
-                    (:Simulation, :write_simulation))
+                    (:Tracers, :write_tracers), (:ParticleTrail, :write_trail),
+                    (:AbstractForcing, :write_forcing), (:Simulation, :write_simulation))
   @eval function Base.setindex!(parent::Union{HDF5.File, HDF5.Group}, object::$T,
                                 name::AbstractString)
     $writer(parent, name, object)

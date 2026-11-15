@@ -1,19 +1,19 @@
 # Witness: `advance!` must reject a non-positive `dt` regardless of the particle integration scheme.
 #
-# Today the only guard on a degenerate step lives in `advect!(::AdamsBashforth, …)`
-# (src/Particles.jl:459), so whether the call is refused depends on which *trajectory* scheme a run
-# happens to carry — not on the field solver, where Δt is actually consumed. With dt < 0 the
+# The defect: the only guard on a degenerate step lived in the multistep particle scheme's
+# `advect!`, so whether the call was refused depended on which *trajectory* scheme a run
+# happened to carry — not on the field solver, where Δt is actually consumed. With dt < 0 the
 # integrating factor becomes exp(+ν|κ|²|Δt|) and the step is an unconditionally unstable backward
 # heat solve; the clock also runs backwards.
 
 using Test, Random, GBGHomogeneousTurbulence
 
-@testset "advance! rejects a non-positive dt for every particle integration scheme, not only AdamsBashforth" begin
+@testset "advance! rejects a non-positive dt for every particle integration scheme, not only a multistep one" begin
 
-  # Control: the multistep scheme already refuses it, at the wrong layer.
+  # Control: a run under a multistep scheme, which once refused it at the wrong layer.
   a = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
                  particles = ParticleTracking(number_of_particles = 4,
-                                              particle_integration_scheme = AdamsBashforth(order = 2)),
+                                              particle_integration_scheme = AB(2)),
                  rng = MersenneTwister(1))
   @test_throws ArgumentError advance!(a; dt = -2e-3)
 

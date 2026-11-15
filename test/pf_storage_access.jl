@@ -1,4 +1,5 @@
-# Every place HT reads or writes a GBGPeriodicFields field's raw storage, `field_data(…)`, is listed
+# Every place HT reads or writes a GBGPeriodicFields object's raw storage — a field's, `field_data(…)`,
+# or a point object's, `point_values(…)` and `point_positions(…)` — is listed
 # here with the ruling that allows it. PF owns the storage layout, and HT reaching past PF's operations
 # is how the mean-mode index, the resident band indicator and the raw rescalings got in (decision 99).
 # The list works in both directions: a new call site fails until it is ruled on, and an entry whose
@@ -24,9 +25,32 @@ const ALLOWED = Dict(
     "backend; adapt! then moves it",
 )
 
-# Every `field_data(` in code, skipping comment lines and docstring bodies. A line is a docstring line
+# The point objects' storage (the owner, 2026-11-13: the package never works on, or hands out, bare
+# arrays where a PF object exists). No site reaches the VALUES at points any more. What remains
+# reaches a point set's POSITIONS, each for something PF has no operation for yet; each is a request
+# to PF, and its entry goes when PF answers it.
+const ALLOWED_POINTS = Dict(
+  ("src/Particles.jl", "supplied = point_positions(positions)") =>
+    "PENDING A PF REQUEST: adopting a caller's point set onto the domain's backend AND element type; " *
+    "PF's `adapt!` moves storage and refuses a change of precision",
+  ("src/Particles.jl", "coordinates = point_positions(tracers.positions)") =>
+    "PENDING A PF REQUEST: the identity permutation a `PointTraversalOrder` starts from is allocated " *
+    "like the positions; PF has no constructor of an order for a point set",
+  ("src/Particles.jl", "new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(point_positions(tracers.positions)))") =>
+    "PENDING A PF REQUEST: point values allocated for a point set; `similar_point_values` takes point " *
+    "values as its reference, not a point set",
+  ("src/Particles.jl", "ScalarPointValues(similar(point_positions(tracers.positions),") =>
+    "PENDING A PF REQUEST: as the vector allocator above",
+  ("src/Particles.jl", "eltype(point_positions(tracers.positions)),") =>
+    "PENDING A PF REQUEST: as the vector allocator above",
+  ("src/SimulationRun.jl", "!(point_positions(particles.tracers.positions) isa domain.array_family) &&") =>
+    "PENDING A PF REQUEST: which backend a point set lives on; PF's array-family query is internal",
+)
+
+# Every call of one of `needles` (a string, or a regex where a longer name must not match) in code,
+# skipping comment lines and docstring bodies. A line is a docstring line
 # when an odd number of triple quotes precedes it in the file.
-function storage_sites(root)
+function storage_sites(root, needles = ("field_data(",))
   sites = Tuple{String, Int, String}[]
   for dir in ("src", "ext"), (path, _, files) in walkdir(joinpath(root, dir)), file in files
     endswith(file, ".jl") || continue
@@ -36,19 +60,20 @@ function storage_sites(root)
     for (number, line) in enumerate(eachline(full))
       quotes = count("\"\"\"", line)
       code = !in_docstring && quotes == 0 && !startswith(lstrip(line), "#")
-      code && occursin("field_data(", split(line, '#')[1]) && push!(sites, (relative, number, strip(line)))
+      code && any(needle -> occursin(needle, split(line, '#')[1]), needles) &&
+        push!(sites, (relative, number, strip(line)))
       isodd(quotes) && (in_docstring = !in_docstring)
     end
   end
   return sites
 end
 
-allowed(site) = any(((file, fragment),) -> file == site[1] && occursin(fragment, site[3]), keys(ALLOWED))
+allowed(site, list = ALLOWED) = any(((file, fragment),) -> file == site[1] && occursin(fragment, site[3]), keys(list))
 
-function unlisted_and_stale(root)
-  sites = storage_sites(root)
-  unlisted = filter(!allowed, sites)
-  stale = [key for key in keys(ALLOWED) if !any(s -> s[1] == key[1] && occursin(key[2], s[3]), sites)]
+function unlisted_and_stale(root; needles = ("field_data(",), list = ALLOWED)
+  sites = storage_sites(root, needles)
+  unlisted = filter(site -> !allowed(site, list), sites)
+  stale = [key for key in keys(list) if !any(s -> s[1] == key[1] && occursin(key[2], s[3]), sites)]
   return unlisted, stale, length(sites)
 end
 
@@ -79,5 +104,36 @@ end
     planted_unlisted, planted_stale, _ = unlisted_and_stale(tree)
     @test any(s -> s[1] == "src/Observables.jl" && occursin("_planted", s[3]), planted_unlisted)
     @test ("src/Forcing.jl", "randn!(ou.rng, field_data(slots.draws))") in planted_stale
+  end
+end
+
+
+@testset "raw PF point storage is reached only at the listed sites, and the values at points nowhere" begin
+  # The accessor itself, not a longer name ending in it (`similar_point_values`, `new_vector_point_values`).
+  values_needle = r"(?<![\w!])point_values\("
+  point_needles = (values_needle, r"(?<![\w!])point_positions\(")
+  unlisted, stale, total = unlisted_and_stale(PACKAGE_ROOT; needles = point_needles, list = ALLOWED_POINTS)
+  for (file, number, line) in unlisted
+    @info "unlisted raw point-storage site — use PF's operation, or raise the missing one to PF and list it" file number line
+  end
+  for key in stale
+    @info "stale allowlist entry — its site is gone, remove it" key
+  end
+  @test isempty(unlisted)
+  @test isempty(stale)
+  @test total == length(ALLOWED_POINTS)
+  # The values at points — the samples, a caller's buffers — are never unwrapped: every listed site
+  # is a point set's positions.
+  @test isempty(first(unlisted_and_stale(PACKAGE_ROOT; needles = (values_needle,), list = Dict())))
+
+  # The check can fail: a planted unwrap in a copy of the tree is reported.
+  mktempdir() do tree
+    cp(joinpath(PACKAGE_ROOT, "src"), joinpath(tree, "src"))
+    cp(joinpath(PACKAGE_ROOT, "ext"), joinpath(tree, "ext"))
+    open(joinpath(tree, "src", "Cache.jl"), "a") do io
+      println(io, "_planted(trail) = point_values(trail.values[1])")
+    end
+    planted, _, _ = unlisted_and_stale(tree; needles = point_needles, list = ALLOWED_POINTS)
+    @test any(s -> s[1] == "src/Cache.jl" && occursin("_planted", s[3]), planted)
   end
 end

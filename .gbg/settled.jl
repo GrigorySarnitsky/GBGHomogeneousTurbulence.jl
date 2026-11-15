@@ -21,7 +21,7 @@
             text = "Already fixed by finding 008's commit, which restored the truncated references verbatim (owner, 2026-10-11).",
             date = "2026-10-11",
             locations = [
-                Location(file = "src/Particles.jl", node = "AdamsBashforth", text = "J. Comput. Phys. **229*", line = 483),
+                Location(file = "src/ParticlePropagator.jl", node = "AB", text = "J. Comput. Phys. **229*", line = 217),
             ]),
     Settled(question = "2026-10-04-documentation-review-01-093-code",
             text = "Already fixed by finding 003's commit: the page counts six published files (owner, 2026-10-11).",

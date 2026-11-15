@@ -117,7 +117,7 @@ using Test
     for read in ("sim.state.velocity_spectral", "sim.state.scalar_spectral",
                  "velocity_physical(sim.cache)", "vorticity_physical(sim.cache)",
                  "scalar_physical(sim.cache)", "max_speed(sim.cache)",
-                 "velocity_at_particles(sim.cache)", "sim.tracers.positions",
+                 "velocity_at_particles_trail(sim.cache)", "sim.tracers.positions",
                  "current_time(sim)")
       @test occursin(read, shown)
     end

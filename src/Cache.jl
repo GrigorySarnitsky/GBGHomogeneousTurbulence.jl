@@ -22,7 +22,8 @@ The cache's operations:
 - [`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed) — the cached largest flow speed,
   the number the timestep choice reads (one generic with the field reduction in `Observables`, whose
   docstring is the home).
-- [`velocity_at_particles`](@ref) — the checked read of the velocity sampled along each trajectory.
+- [`velocity_at_particles_trail`](@ref) — the checked read of the velocity sampled along each
+  trajectory: its last few samples, the newest first.
 
 The field slots are filled by [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), which
 `Propagator` owns rather than this module because it needs the scheme's scratch to recover the
@@ -30,22 +31,23 @@ fields. Each slot carries both the value and the epoch that value belongs to, so
 rather than served stale.
 
 The solver's side of the contract is that `deposit!` fills every field-derived slot at the
-iteration's end (the velocity-at-particles slot is filled by the same generic's particle form,
-after the tracers advance) and sets
-its epoch. A caller reads through the accessors, and deposits only when running the iteration by
-hand.
+iteration's end (the trail of the velocity at the particles receives its new sample from the same
+generic's particle form, after the tracers advance) and sets
+its epoch. A caller reads through the accessors.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
 and a slot is readable exactly when its own epoch equals the counter it depends on.
 """
 module Cache
 
-using GBGPeriodicFields: point_values, field_data, field_scalar_type, VectorPointValues, npoints
+using GBGPeriodicFields: field_scalar_type
 using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_field_physical
+using ..Particles: Tracers, ParticleTrail, new_vector_point_values, trail_capacity,
+                   _new_trail, _next_slot!, _check_time, _push!, _empty!, _capacity
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-       velocity_at_particles
+       velocity_at_particles_trail
 
 
 # Epoch sentinels. A slot's epoch is the fields epoch it was deposited at; the sentinels mark the
@@ -56,7 +58,8 @@ const SCRATCH = -1
 
 
 """
-    ObservablesCache(domain; scalar = false, number_of_particles = 0, history_depth = 1)
+    ObservablesCache(domain; scalar = false, tracers = nothing,
+                     particle_integration_scheme = nothing)
 
 The observables cache of a run — the storage where each iteration deposits, at its end, the
 observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vorticity
@@ -64,7 +67,8 @@ observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vort
 representation when the run carries one, the fastest flow speed on the grid (the
 [`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed) number the next timestep choice
 reads), and — when the run advects tracers — the flow velocity at the tracer positions
-``\\boldsymbol{X}`` at the current time ``t_n``, ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``.
+``\\boldsymbol{X}``, ``\\boldsymbol{u}(t, \\boldsymbol{X}(t))``, at the current time and at the
+few earlier times the particle integration scheme works from.
 
 The contents are automatic, derived from the configuration: the cache holds
 exactly what the iteration computes, materializes, and leaves alive at its end, and nothing more.
@@ -73,23 +77,19 @@ observable of the flow, not particle state (a tracer has no velocity of its own)
 lives here and the tracer push writes into it exactly as the step writes into the field slots.
 
 Build it on a [`FixedDomain`](@ref) `domain`. [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) builds, wires,
-and seeds one for you; a hand-assembled run constructs it here.
+and seeds one for you.
 
 # Arguments
-- `domain` — the `FixedDomain` the run lives on; it sizes every slot.
+- `domain` — the `FixedDomain` the run lives on; it sizes every field slot.
 - `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
-- `history_depth = 1` — how many Lagrangian samples the run must be able to look back over,
-  including the current one. A hand-assembled run sets it to
-  [`history_depth(scheme)`](@ref GBGHomogeneousTurbulence.Particles.history_depth) for its particle
-  integration scheme. A one-step scheme needs 1 and stores no history; an `order`-step scheme needs
-  `order`, and allocating the scheme's per-step buffers
-  ([`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers)) refuses a cache
-  whose depth differs from it.
-- `number_of_particles = 0` — the number of tracers the run advects; a positive count allocates
-  the velocity-at-particles slot (an ``M \\times 3`` array of point values, ``M`` this count) and its sample history.
+- `tracers = nothing` — the [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers) the run
+  advects; they size the trail of the velocity at the particles.
+- `particle_integration_scheme = nothing` — the scheme that advances those tracers, which fixes how
+  many samples the trail keeps. Give both of these or neither.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
-[`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
+[`scalar_physical`](@ref), [`velocity_at_particles_trail`](@ref), and `max_speed` — each of which
+returns the deposited value or throws.
 Nothing in the cache is ever recomputed: a read that finds a slot stale, *taken* (in use as the
 step's own scratch mid-iteration), or never deposited throws an `ErrorException` naming the slot
 and its state — a scheduling error whose only repair is to fix the schedule that failed to
@@ -109,65 +109,67 @@ depends on.
 - `velocity_physical`, `vorticity_physical` — the cached velocity and vorticity in physical
   representation. Mid-iteration the step also writes each stage's velocity and vorticity *into
   these same arrays*, which is why they are not readable then.
+
 - `scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
+
 - `max_speed` — the cached fastest flow speed (a host number in the field's own element type).
-- `velocity_at_particles` — the velocity sampled at the particle positions, or `nothing` for a tracer-free run.
-- `velocity_at_particles_history` — the earlier Lagrangian samples, most recent first. A multistep
-  particle integration scheme integrates over these.
-- `history_steps` — the step sizes the earlier samples were taken over.
-- `history_filled` — how many of the earlier samples are valid.
+
+- `velocity_at_particles_trail` — the
+  [`ParticleTrail`](@ref GBGHomogeneousTurbulence.Particles.ParticleTrail) of the velocity sampled
+  at the particle positions, or `nothing` for a tracer-free run.
+
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
-- `velocity_at_particles_fields_epoch`, `velocity_at_particles_particles_epoch` — the velocity-at-particles slot's two epochs, against
-  both counters, since that sample is a function of the state and the positions together.
+
+- `velocity_at_particles_epoch` — the particles epoch the trail's newest sample was taken at.
+
 - `fields_epoch` — the resolved fields' counter, advanced by every completed step. A field-derived
   slot is readable exactly when its epoch equals this.
+
 - `particles_epoch` — the tracer positions' counter, advanced by every
-  [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) push.
+  [`advect!`](@ref GBGHomogeneousTurbulence.ParticlePropagator.advect!) push.
 """
-mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
+mutable struct ObservablesCache{PV, PS, TR, T <: AbstractFloat}
   const velocity_physical::PV
   const vorticity_physical::PV
   const scalar_physical::PS
-  const velocity_at_particles::TS
-  # The earlier samples of the SAME observable, most recent first, with the step sizes they span.
-  # They live here, with the slot they extend. Held apart from the current slot rather than as a
-  # ring including it, because the current slot is the tracer set's own storage, written in place.
-  const velocity_at_particles_history::Vector{TS}
-  const history_steps::Vector{Float64}
-  history_filled::Int
+  # The velocity at the particles, as the trail of its last few samples: the newest is the current
+  # observable, the earlier ones are what a multistep scheme integrates over and what a time
+  # derivative along the trajectories is taken from.
+  const velocity_at_particles_trail::TR
   velocity_epoch::Int
   vorticity_epoch::Int
   scalar_epoch::Int
   max_speed::T
   max_speed_epoch::Int
-  velocity_at_particles_fields_epoch::Int
-  velocity_at_particles_particles_epoch::Int
+  velocity_at_particles_epoch::Int
   fields_epoch::Int
   particles_epoch::Int
 end
 
 function ObservablesCache(domain::FixedDomain; scalar::Bool = false,
-                          number_of_particles::Integer = 0, history_depth::Integer = 1)
+                          tracers::Union{Nothing, Tracers} = nothing,
+                          particle_integration_scheme = nothing)
+  (tracers === nothing) == (particle_integration_scheme === nothing) ||
+    throw(ArgumentError("give `tracers` and `particle_integration_scheme` together, or neither: " *
+                        "the tracers size the trail of the velocity at the particles and the " *
+                        "scheme fixes how many samples it keeps"))
   velocity = new_vector_field_physical(domain)
   # The speed slot takes the field's own element type, read off the velocity slot beside it: a
   # hardwired `Float64` promoted a Float32 run's timestep arithmetic and broke the element-type
   # contract the rest of the observables surface keeps. `NaN` in that type is the never-deposited
   # value, matching the epoch sentinel next to it.
   T = field_scalar_type(velocity)
-  # The velocity-at-particles slot is the cache's own, like every other slot (decision 67 — the
-  # sample is an observable of the flow, not particle state, so its storage lives with the observables): an
-  # M×3 point-value section on the domain's backend, plus `history_depth - 1` past samples for a
-  # multistep scheme. A one-step scheme asks for 1 and gets no history.
-  velocity_at_particles = number_of_particles > 0 ?
-    VectorPointValues(domain.array_family{T}(undef, Int(number_of_particles), 3)) : nothing
-  past = velocity_at_particles === nothing ? typeof(velocity_at_particles)[] :
-         [deepcopy(velocity_at_particles) for _ in 1:max(history_depth - 1, 0)]
+  # The trail is the cache's own, like every other slot (decision 67 — the sample is an observable of
+  # the flow, not particle state, so its storage lives with the observables), built by the
+  # constructor a caller's own trail is built by, and marked so that only the particle deposit adds
+  # to it.
+  trail = tracers === nothing ? nothing :
+          _new_trail(new_vector_point_values, tracers, trail_capacity(particle_integration_scheme), true)
   return ObservablesCache(velocity, new_vector_field_physical(domain),
-                          scalar ? new_scalar_field_physical(domain) : nothing,
-                          velocity_at_particles, past, zeros(Float64, length(past)), 0,
+                          scalar ? new_scalar_field_physical(domain) : nothing, trail,
                           NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED,
-                          T(NaN), NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED, 1, 1)
+                          T(NaN), NEVER_DEPOSITED, NEVER_DEPOSITED, 1, 1)
 end
 
 
@@ -245,28 +247,37 @@ end
 
 
 """
-    velocity_at_particles(cache)
+    velocity_at_particles_trail(cache)
 
-The flow velocity at the tracer positions ``\\boldsymbol{X}`` at the current time ``t_n``,
-``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, at the current epoch — the ``(M, 3)`` array (``M`` the tracer count) of the velocity sampled at each tracer's position at
-that instant: the genuine Lagrangian velocity, the input to the caller's statistics. Treat the returned array as
-read-only — it is the cache's own slot, and the tracer advance writes into it mid-iteration. This is
-the checked read of the [`ObservablesCache`](@ref) `cache`'s velocity-at-particles slot: it serves the
-deposited values or throws an `ErrorException`, like every cached read — the sample depends on the
-state and the positions, so it is current only when both counters match its own. Throws an
-`ArgumentError` when the run advects no tracers.
+The flow velocity at the tracer positions ``\\boldsymbol{X}``,
+``\\boldsymbol{u}(t, \\boldsymbol{X}(t))`` — the genuine Lagrangian velocity, the input to the
+caller's statistics — as the [`ParticleTrail`](@ref GBGHomogeneousTurbulence.Particles.ParticleTrail)
+of its last few samples. `trail[0].value` is the velocity at the current time ``t_n``, one vector
+per tracer, and `trail[0].time` is that time; `trail[-1]` is the sample one iteration back. How
+many samples the trail keeps is fixed by the run's particle integration scheme, whose docstring
+states it. Treat every value as read-only — it is the cache's own storage, and the tracer advance
+writes into it mid-iteration.
+
+This is the checked read of the [`ObservablesCache`](@ref) `cache`: it serves the deposited
+samples or throws an `ErrorException`, like every cached read. The samples belong to the
+particles' time, so they are current exactly while the positions have not moved since the newest
+was taken. Throws an `ArgumentError` when the run advects no tracers.
 """
-function velocity_at_particles(cache::ObservablesCache)
-  cache.velocity_at_particles === nothing &&
-    throw(ArgumentError("this run advects no tracers, so the cache has no velocity-at-particles slot"))
-  # BOTH epochs, because the sample is a function of the state AND the positions — which is the whole
-  # reason the cache keeps two counters for this one slot.
-  (cache.velocity_at_particles_fields_epoch == cache.fields_epoch &&
-   cache.velocity_at_particles_particles_epoch == cache.particles_epoch) ||
-    error("the cached velocity at the particles is stale: the state or the tracer positions have advanced " *
-          "past the deposited values, and nothing in the cache is ever recomputed; read " *
+function velocity_at_particles_trail(cache::ObservablesCache)
+  trail = cache.velocity_at_particles_trail
+  trail === nothing &&
+    throw(ArgumentError("this run advects no tracers, so the cache has no trail of the velocity " *
+                        "at the particles"))
+  cache.velocity_at_particles_epoch == NEVER_DEPOSITED &&
+    error("the cached velocity at the particles was never deposited: the schedule of this run " *
+          "does not fill it before this read (a fresh cache is seeded by its deposit at construction)")
+  # The particles counter alone: a sample is u(t, X(t)) at the time the positions were at X, so a
+  # field step taken since does not date it — only a move of the positions does.
+  cache.velocity_at_particles_epoch == cache.particles_epoch ||
+    error("the cached velocity at the particles is stale: the tracer positions have advanced " *
+          "past the newest sample, and nothing in the cache is ever recomputed; read " *
           "between iterations, after the closing deposit")
-  return point_values(cache.velocity_at_particles)
+  return trail
 end
 
 
@@ -286,16 +297,96 @@ take_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = SCRATCH; cache.sca
 deposit_velocity!(cache::ObservablesCache) = (cache.velocity_epoch = cache.fields_epoch; cache.velocity_physical)
 deposit_vorticity!(cache::ObservablesCache) = (cache.vorticity_epoch = cache.fields_epoch; cache.vorticity_physical)
 deposit_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = cache.fields_epoch; cache.scalar_physical)
-deposit_max_speed!(cache::ObservablesCache{PV, PS, TS, T}, value::Real) where {PV, PS, TS, T} =
+deposit_max_speed!(cache::ObservablesCache{PV, PS, TR, T}, value::Real) where {PV, PS, TR, T} =
   (cache.max_speed = T(value); cache.max_speed_epoch = cache.fields_epoch; value)
-# The stamping half of the particle deposit, beside its field-slot siblings above: mark the
-# velocity-at-particles slot current against BOTH counters — the fields epoch of the interpolated
-# velocity and the particles epoch of the positions — since the sample is a function of the two
-# together. `deposit!`'s particle method (in `Particles`, the module that owns the interpolation)
-# writes the values and then calls this.
-deposit_velocity_at_particles!(cache::ObservablesCache) =
-  (cache.velocity_at_particles_fields_epoch = cache.fields_epoch;
-   cache.velocity_at_particles_particles_epoch = cache.particles_epoch; cache.velocity_at_particles)
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# The particle side. The trail is written through these functions alone, by the particle step, the
+# particle deposit and the checkpoint's restore, so that no other module reaches into its state.
+#
+# Two counters say whether a field and a set of positions belong to one time: each rises by one
+# with its own advance, and they are equal exactly when the positions have caught up with the
+# fields. An iteration reads them as
+#
+#     start: fields n, particles n → field step: n + 1, n → particle step: n + 1, n + 1 → sample.
+
+function _particle_trail(cache::ObservablesCache)
+  cache.velocity_at_particles_trail === nothing &&
+    throw(ArgumentError("this cache carries no trail of the velocity at the particles: build it " *
+                        "with the run's `tracers` and `particle_integration_scheme`"))
+  return cache.velocity_at_particles_trail
+end
+
+# The read the particle step makes, with the check that belongs to it: the fields have taken
+# exactly one step past the positions, and the newest sample was taken at these positions. The
+# velocity field the step then interpolates is read through its own checked accessor.
+function trail_for_particle_step(cache::ObservablesCache, capacity::Integer)
+  trail = _particle_trail(cache)
+  _capacity(trail) == capacity ||
+    throw(ArgumentError("this cache's trail of the velocity at the particles keeps " *
+                        "$(_capacity(trail)) sample(s), but the particle integration scheme " *
+                        "works from $capacity: build the cache with the scheme that advances the tracers"))
+  cache.velocity_at_particles_epoch == cache.particles_epoch ||
+    error("the particle step has no current velocity sample to start from: the particle deposit " *
+          "that closes the previous advance was not made")
+  cache.fields_epoch == cache.particles_epoch + 1 ||
+    error("the particle step needs the fields exactly one step ahead of the tracer positions, " *
+          "and they are $(cache.fields_epoch - cache.particles_epoch) ahead: advance the fields " *
+          "once, deposit, then advance the tracers")
+  return trail
+end
+
+# The particle side as it stands between iterations, which is where an iteration must start: the
+# newest sample taken at the current positions, and the positions level with the fields. Returns the
+# trail.
+function trail_between_iterations(cache::ObservablesCache)
+  trail = velocity_at_particles_trail(cache)
+  cache.particles_epoch == cache.fields_epoch ||
+    error("the fields have taken $(cache.fields_epoch - cache.particles_epoch) step(s) that the " *
+          "tracers have not, so the two belong to different times. A run that has let them part " *
+          "cannot be repaired; build a new one from its state and tracers")
+  return trail
+end
+
+# The storage the particle step may use as scratch for the velocity at its predicted positions: the
+# slot the closing deposit will fill, which no read can reach meanwhile.
+take_velocity_at_particles!(cache::ObservablesCache) = _next_slot!(_particle_trail(cache))
+
+# The particle deposit, around the interpolation the caller supplies as `fill_value!`: check that
+# the field and the positions belong to one time, add the sample at time `t`, and stamp it.
+function deposit_velocity_at_particles!(fill_value!, cache::ObservablesCache, t::Real)
+  trail = _particle_trail(cache)
+  _check_time(trail, t)                    # refused before anything is changed
+  if cache.velocity_at_particles_epoch == NEVER_DEPOSITED
+    # The first sample starts the pairing: fields stepped alone before any tracking began leave the
+    # counters apart, and from here on they must move together. Asked of the stamp, not of the
+    # trail's being empty: a trail of one slot is empty again whenever a sample fails to be written.
+    cache.particles_epoch = cache.fields_epoch
+  else
+    cache.particles_epoch == cache.fields_epoch ||
+      error("the velocity cannot be sampled at the particles: the fields and the tracer " *
+            "positions belong to different times (the fields have taken " *
+            "$(cache.fields_epoch - cache.particles_epoch) more step(s)). A run that has let " *
+            "them part cannot be repaired; build a new one from its state and tracers")
+    cache.velocity_at_particles_epoch == cache.particles_epoch &&
+      error("the velocity at the particles is already sampled at these positions; the next " *
+            "sample follows the next particle step")
+  end
+  _push!(fill_value!, trail, t)
+  cache.velocity_at_particles_epoch = cache.particles_epoch
+  return cache
+end
+
+# The checkpoint's restore: empty the trail, so that the stored earlier samples can be put back in
+# time order (`restore_velocity_at_particles!`) before the ordinary deposit adds the newest.
+function reset_velocity_at_particles!(cache::ObservablesCache)
+  _empty!(_particle_trail(cache))
+  cache.velocity_at_particles_epoch = NEVER_DEPOSITED
+  return cache
+end
+
+restore_velocity_at_particles!(fill_value!, cache::ObservablesCache, t::Real) =
+  (_push!(fill_value!, _particle_trail(cache), t); cache)
 
 
 # The deposit-completeness check: every slot the configuration carries must sit at the
@@ -311,31 +402,31 @@ function check_deposits(cache::ObservablesCache)
     error("iteration closed with the scalar slot undeposited — a solver scheduling bug")
   cache.max_speed_epoch == cache.fields_epoch ||
     error("iteration closed with the maximum speed undeposited — a solver scheduling bug")
-  cache.velocity_at_particles === nothing ||
-    (cache.velocity_at_particles_fields_epoch == cache.fields_epoch &&
-     cache.velocity_at_particles_particles_epoch == cache.particles_epoch) ||
+  cache.velocity_at_particles_trail === nothing ||
+    (cache.velocity_at_particles_epoch == cache.particles_epoch &&
+     cache.particles_epoch == cache.fields_epoch) ||
     error("iteration closed with the velocity sample undeposited — a solver scheduling bug")
   return cache
 end
 
 
 # The run's field advance: `step!` calls this as the step completes, so every field-derived slot reads
-# as stale until the closing deposit. The Lagrangian sample history is untouched: the samples are
-# exactly what a multistep particle integration scheme integrates over next.
+# as stale until the closing deposit. The trail of the velocity at the particles is untouched: its
+# samples belong to the particles' time, and are what the particle step integrates over next.
 advance_fields_epoch!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
 
-# The run's tracer advance: every `advect!` push calls this, so the velocity-at-particles slot reads as
-# stale until the closing particle deposit. The sample history is untouched, as on the field side.
+# The run's tracer advance: every `advect!` push calls this, so the trail of the velocity at the
+# particles reads as stale until the closing particle deposit adds the sample at the new positions.
 advance_particles_epoch!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # Display (the convention is stated once, at `SimulationDomain`'s display section). The one line
 # carries what a consumer refuses on: the velocity slot (grid, element type, storage — the library's
-# spelling), the optional scalar and particle slots through their own displays — the particle one
-# carries the count a tracer set is matched on — and the history depth a multistep particle scheme
-# demands. An absent slot is said aloud as `no scalar` / `no particles`, the package's one spelling
+# spelling), the optional scalar slot and the particle trail through their own displays — the trail's
+# carries the count a tracer set is matched on and the capacity a particle scheme is matched on.
+# An absent slot is said aloud as `no scalar` / `no particles`, the package's one spelling
 # of an absent companion. The REPL form adds each slot's standing, read off the epochs exactly as the
 # checked reads decide it — and reads nothing, so it prints where a read would throw.
 
@@ -343,12 +434,8 @@ function Base.show(io::IO, cache::ObservablesCache)
   print(io, "ObservablesCache(", cache.velocity_physical)
   isnothing(cache.scalar_physical) ? print(io, ", no scalar") :
     print(io, ", scalar_physical ", cache.scalar_physical)
-  if isnothing(cache.velocity_at_particles)
-    print(io, ", no particles")
-  else
-    print(io, ", velocity_at_particles ", cache.velocity_at_particles, ", history depth ",
-          length(cache.velocity_at_particles_history) + 1)
-  end
+  isnothing(cache.velocity_at_particles_trail) ? print(io, ", no particles") :
+    print(io, ", velocity_at_particles_trail ", cache.velocity_at_particles_trail)
   print(io, ")")
 end
 
@@ -360,37 +447,25 @@ function _standing(epoch::Int, current::Int)
   return "stale (deposited at fields epoch $epoch)"
 end
 
-# The particle slot answers to two counters — the sample is a function of the state AND the
-# positions — so its standing names whichever has moved on, or both. The sentinels are tested first:
-# a never-deposited slot is not "advanced past", whatever the counters say.
+# The trail answers to the particles counter alone: its samples belong to the particles' time.
 function _particle_standing(cache::ObservablesCache)
-  fields_epoch, particles_epoch = cache.velocity_at_particles_fields_epoch, cache.velocity_at_particles_particles_epoch
-  fields_epoch == SCRATCH && return "a producer's scratch (mid-iteration)"
-  fields_epoch == NEVER_DEPOSITED && return "never deposited"
-  fields_current, particles_current = fields_epoch == cache.fields_epoch, particles_epoch == cache.particles_epoch
-  fields_current && particles_current && return "current"
-  fields_current && return "stale (the tracer positions have advanced past the deposited sample)"
-  particles_current && return "stale (deposited at fields epoch $fields_epoch)"
-  return "stale (deposited at fields epoch $fields_epoch, and the tracer positions have advanced since)"
+  cache.velocity_at_particles_epoch == NEVER_DEPOSITED && return "never deposited"
+  cache.velocity_at_particles_epoch == cache.particles_epoch && return "current"
+  return "stale (the tracer positions have advanced past the newest sample)"
 end
 
 function Base.show(io::IO, ::MIME"text/plain", cache::ObservablesCache)
   now = cache.fields_epoch
-  slot(name, value, standing) = print(io, "\n  ", rpad(name, 23), value, " — ", standing)
-  absent(name, why) = print(io, "\n  ", rpad(name, 23), "nothing (", why, ")")
+  slot(name, value, standing) = print(io, "\n  ", rpad(name, 29), value, " — ", standing)
+  absent(name, why) = print(io, "\n  ", rpad(name, 29), "nothing (", why, ")")
   print(io, "ObservablesCache (fields epoch ", now, ", particles epoch ", cache.particles_epoch, ")")
   slot("velocity_physical", cache.velocity_physical, _standing(cache.velocity_epoch, now))
   slot("vorticity_physical", cache.vorticity_physical, _standing(cache.vorticity_epoch, now))
   isnothing(cache.scalar_physical) ? absent("scalar_physical", "no scalar") :
     slot("scalar_physical", cache.scalar_physical, _standing(cache.scalar_epoch, now))
   slot("max_speed", cache.max_speed, _standing(cache.max_speed_epoch, now))
-  if isnothing(cache.velocity_at_particles)
-    absent("velocity_at_particles", "no particles")
-  else
-    slot("velocity_at_particles", cache.velocity_at_particles, _particle_standing(cache))
-    depth = length(cache.velocity_at_particles_history) + 1
-    slot("history", "depth $depth", "$(cache.history_filled) of $(depth - 1) past samples filled")
-  end
+  isnothing(cache.velocity_at_particles_trail) ? absent("velocity_at_particles_trail", "no particles") :
+    slot("velocity_at_particles_trail", cache.velocity_at_particles_trail, _particle_standing(cache))
 end
 
 

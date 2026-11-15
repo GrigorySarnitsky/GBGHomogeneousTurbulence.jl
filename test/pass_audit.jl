@@ -25,13 +25,15 @@ using GBGHomogeneousTurbulence
 using GBGPeriodicFields: VectorFieldSpectral, VectorFieldPhysical, ScalarFieldSpectral, field_data,
                          materialize_kernel, spectral_band
 using Random
+import GBGPeriodicFields
 using Logging
 import KernelAbstractions
 import GBGCodingTools
 using GBGCodingTools.TestHarness: CountingArray, Traffic, counting, audit
 using GBGHomogeneousTurbulence.Forcing: add_forcing_source!, project_forcing!, prepare_forcing!
 using GBGHomogeneousTurbulence.Generator: prepare!, finalize!
-using GBGHomogeneousTurbulence.Particles: advect!, new_vector_point_values
+using GBGHomogeneousTurbulence.Particles: new_vector_point_values
+using GBGHomogeneousTurbulence.ParticlePropagator: advect!
 using GBGHomogeneousTurbulence.Propagator: deposit!
 
 # The tool does not depend on KernelAbstractions, so a consumer names the backend a counting array
@@ -39,8 +41,9 @@ using GBGHomogeneousTurbulence.Propagator: deposit!
 KernelAbstractions.get_backend(a::CountingArray) = KernelAbstractions.get_backend(a.data)
 
 const HT = GBGHomogeneousTurbulence
-const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Cache, HT.Forcing,
-                       HT.Generator, HT.Propagator, HT.Particles, HT.SimulationRun]
+const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Particles, HT.Cache, HT.Forcing,
+                       HT.Generator, HT.Propagator, HT.ParticlePropagator, HT.SimulationRun]
+include("cache_counters.jl")
 const PRINT_COUNTS = get(ENV, "PASS_AUDIT_PRINT", "0") == "1"
 
 const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π, dealiasing = TwoThirds(),
@@ -60,6 +63,24 @@ const Û = counting_spectral(RUN.state.velocity_spectral)
 const N̂ = counting_spectral(new_vector_field_spectral(DOMAIN))
 const U = counting_physical(velocity_physical(RUN.cache))
 const SAMPLES = new_vector_point_values(RUN.tracers)
+# A trail of three samples, for the time derivative.
+const TRAIL = let trail = ParticleTrail(new_vector_point_values, RUN.tracers, 3)
+  for t in (0.0, 0.1, 0.25)
+    push!(value -> fill!(GBGPeriodicFields.point_values(value), t), trail, t)
+  end
+  trail
+end
+# The particle step and deposit read the velocity from the cache they are given, so their traffic is
+# counted on a cache assembled around the counting field `U`: the run's own slots beside it, and a
+# trail of its own with one sample to start from.
+const COUNTED = let cache = RUN.cache, trail = HT.Particles._new_trail(new_vector_point_values, RUN.tracers, 2, true)
+  counted = HT.Cache.ObservablesCache(U, counting_physical(cache.vorticity_physical), cache.scalar_physical, trail,
+                                      1, HT.Cache.NEVER_DEPOSITED, HT.Cache.NEVER_DEPOSITED,
+                                      cache.max_speed, HT.Cache.NEVER_DEPOSITED,
+                                      HT.Cache.NEVER_DEPOSITED, 1, 1)
+  deposit!(counted, RUN.tracers, 0.0)
+  counted
+end
 const OU_Û = counting_spectral(OU_RUN.state.velocity_spectral)
 const OU_STATE = ResolvedFields(OU_Û, nothing, (velocity_forcing = OU_RUN.state.modeled.velocity_forcing,
                                                 scalar_forcing = nothing))
@@ -116,8 +137,10 @@ for warm in (() -> add_forcing_source!(VELOCITY_FORCING, nothing, N̂, Û, DOMAI
              () -> project_forcing!(TOTAL, Û, DOMAIN), () -> project_forcing!(BAND, Û, DOMAIN),
              () -> truncate_to_band!(Û, DOMAIN),
              () -> interpolate_at_particles!(SAMPLES, U, RUN.tracers),
-             () -> advect!(RUN.particle_integration_scheme, RUN.tracers, U, DOMAIN, RUN.particle_buffers, 1e-3),
-             () -> deposit!(RUN.cache, RUN.tracers, U),
+             () -> advect!(RUN.particle_integration_scheme, RUN.tracers, DOMAIN, ready_for_particle_step!(COUNTED), 1e-3),
+             () -> deposit!(ready_for_particle_deposit!(COUNTED), RUN.tracers, later()),
+             () -> time_derivative!(SAMPLES, TRAIL),
+             () -> push!(value -> interpolate_at_particles!(value, U, RUN.tracers), TRAIL, later()),
              () -> prepare_forcing!(OU, OU_PROCESS, OU_Û, DOMAIN, 1e-3),
              () -> add_forcing_source!(OU, OU_PROCESS, N̂, OU_Û, DOMAIN, 0.05),
              () -> prepare!(OU_RUN.generator, OU_STATE, DOMAIN, 1e-3), () -> finalize!(OU_RUN.generator, OU_STATE, DOMAIN))
@@ -168,9 +191,15 @@ end
   @testset "the tracer gathers: the stencil entries each point needs, once" begin
     audit(() -> interpolate_at_particles!(SAMPLES, U, RUN.tracers), "interpolate_at_particles!",
           Traffic("field", field_data(U), (GATHER, 0), (GATHER, 0)); print = PRINT_COUNTS)
-    audit(() -> advect!(RUN.particle_integration_scheme, RUN.tracers, U, DOMAIN, RUN.particle_buffers, 1e-3),
-          "advect!(Heun)", Traffic("velocity_end", field_data(U), (GATHER, 0), (GATHER, 0)); print = PRINT_COUNTS)
-    audit(() -> deposit!(RUN.cache, RUN.tracers, U), "deposit!(the tracer sample)",
+    audit(() -> advect!(RUN.particle_integration_scheme, RUN.tracers, DOMAIN, ready_for_particle_step!(COUNTED), 1e-3),
+          "advect!(Heun)", Traffic("velocity", field_data(U), (GATHER, 0), (GATHER, 0)); print = PRINT_COUNTS)
+    audit(() -> deposit!(ready_for_particle_deposit!(COUNTED), RUN.tracers, later()), "deposit!(the tracer sample)",
+          Traffic("velocity", field_data(U), (GATHER, 0), (GATHER, 0)); print = PRINT_COUNTS)
+    # A time derivative combines the trail's samples, particle values alone: no field is touched.
+    audit(() -> time_derivative!(SAMPLES, TRAIL), "time_derivative!",
+          Traffic("velocity", field_data(U), (0, 0), (0, 0)); print = PRINT_COUNTS)
+    # A caller's `push!` costs what its own measurement costs: here one gather.
+    audit(() -> push!(value -> interpolate_at_particles!(value, U, RUN.tracers), TRAIL, later()), "push!(a trail)",
           Traffic("field", field_data(U), (GATHER, 0), (GATHER, 0)); print = PRINT_COUNTS)
   end
 end

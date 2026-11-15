@@ -23,5 +23,5 @@ maximum speed is read through [`max_speed`](@ref GBGHomogeneousTurbulence.Observ
 velocity_physical
 vorticity_physical
 scalar_physical
-velocity_at_particles
+velocity_at_particles_trail
 ```

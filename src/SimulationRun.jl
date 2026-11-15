@@ -9,9 +9,9 @@
 # The observables cache is deposit-driven (no recompute anywhere): `advance!` runs `step!`, then the
 # closing `deposit!` recovers the iteration's observables into the cache at the new epoch, and the deposit-
 # completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
-# arithmetic, no grid pass. The tracer advance is Heun on the two endpoint velocities: v₁ is the
-# velocity sample the PREVIOUS closing deposit left (read checked), v₂ interpolates the just-deposited
-# u(tₙ₊₁) at the predictor positions, and the new sample is recorded at the new positions from the
+# arithmetic, no grid pass. The tracer advance integrates over the samples of the velocity at the
+# particles that earlier closing deposits left in the cache's trail, may interpolate the just-deposited
+# u(tₙ₊₁) at the positions it predicts, and the new sample is recorded at the new positions from the
 # same field, completing the iteration's deposits; only M-sized point values are held, never a second field copy.
 
 """
@@ -23,7 +23,7 @@ The run layer:
   fields at the current instant, the observables cache, the equations of motion with their
   forcing, the integration schemes with their scratch, any tracers, and the clock — built with
   defaults from a few numbers. It holds the present instant, and its cache also keeps the earlier
-  tracer velocities a multistep particle scheme needs. An earlier state survives only where the
+  tracer velocities the particle scheme works from. An earlier state survives only where the
   caller records it between iterations.
 - [`PassiveScalar`](@ref) — the passive scalar a run carries, with its Schmidt number, variance
   and forcing, as `Simulation`'s `scalar` setting.
@@ -53,8 +53,8 @@ using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_fie
                           DealiasingStrategy, TwoThirds, max_resolved_wavenumber, _real_type
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!,
                   DEFAULT_PEAK_SHELL
-using ..Cache: ObservablesCache, check_deposits,
-               velocity_physical, max_speed, velocity_at_particles
+using ..Cache: ObservablesCache, check_deposits, max_speed, velocity_at_particles_trail,
+               trail_between_iterations
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
                      scalar_dissipation, energy_spectrum, derivative_skewness,
                      reynolds_box, reynolds_taylor, kolmogorov_length
@@ -65,9 +65,9 @@ using ..Forcing: AbstractForcing, DeferredForcing, NoForcing, ConstantPower, Var
 using ..Generator: FlowConditions, ResolvedGenerator, scalar_diffusivity
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!, deposit!,
                     recommended_cfl, IFLowStorageRK3
-using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
-                   history_depth, ParticleTraversal
+using ..Particles: Tracers, ParticleTraversal
 import ..Particles: rebuild_traversal!
+using ..ParticlePropagator: AbstractParticleIntegrator, Heun, advect!, _steps, _order_of_accuracy
 
 export Simulation, advance!, run!, warmup!, StationarityCriterion,
        current_time, current_step, every_steps, every_time,
@@ -145,9 +145,9 @@ Base.show(io::IO, scalar::PassiveScalar) =
 """
     ParticleTracking(; number_of_particles, interpolation_scheme = CatmullRom,
                        unwrapped = false, particle_integration_scheme = Heun(),
-                       traversal_mode = :automatic)
+                       shortened_first_steps = false, traversal_mode = :automatic)
     ParticleTracking(tracers; particle_integration_scheme = Heun(),
-                     traversal_mode = :automatic)
+                     shortened_first_steps = false, traversal_mode = :automatic)
 
 The Lagrangian tracking a run carries, given as the `particles` setting of [`Simulation`](@ref):
 the run then advects a tracer set every iteration and records the Lagrangian velocity sample. The
@@ -170,17 +170,21 @@ tracking setting can be given to it.
 
 - `tracers` — the tracer set to adopt, in the second form. Its arrays become the run's own and
   are not copied, so two runs must not adopt one set, and it must live on the domain's storage
-  backend. A multistep `particle_integration_scheme` takes its first pushes under
-  [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) until its history fills — restoring a
-  stored sample history alongside the positions is [`read_simulation`](@ref)'s job.
+  backend. The run starts a new trail of the velocity at them; restoring a stored one alongside
+  the positions is [`read_simulation`](@ref)'s job.
 
 - `particle_integration_scheme = Heun()` — the scheme that advances the trajectories in time, an
-  [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator);
-  its *registers* — the per-step scratch that scheme needs, meaningless to read between calls —
-  are allocated for you. Pass
-  [`AdamsBashforth()`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) when trajectory
-  accuracy in time limits a measurement: it costs one stored array per extra order and saves an
-  interpolation per step.
+  [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.ParticlePropagator.AbstractParticleIntegrator).
+  Pass [`AB(4)`](@ref GBGHomogeneousTurbulence.ParticlePropagator.AB) or
+  [`ABM(4)`](@ref GBGHomogeneousTurbulence.ParticlePropagator.ABM) when trajectory
+  accuracy in time limits a measurement.
+
+- `shortened_first_steps = false` — whether the run shortens its first timesteps, the fields'
+  included, so that the lower-order steps a multistep scheme starts with are as accurate as its
+  later ones. The first step is sized from the dissipation rate, measured once, and the step then
+  grows back by a bounded factor per iteration — which stays the limit on its growth for the rest
+  of the run. Without it the first iterations are less accurate, and the scheme's docstring says
+  how many. A fixed `dt` then is an `ArgumentError`.
 
 - `traversal_mode = :automatic` — whether the gathers at the tracers (the velocity for the
   advance and the Lagrangian sample, and any field the caller samples) visit them in the
@@ -197,11 +201,12 @@ tracking setting can be given to it.
 # Fields
 - `tracers` — the set to adopt, or the seeding request (the count, the interpolation scheme and
   whether to keep the unwrapped record) the run builds one from.
-- `particle_integration_scheme`, `traversal_mode` — the settings above.
+- `particle_integration_scheme`, `shortened_first_steps`, `traversal_mode` — the settings above.
 """
 struct ParticleTracking{T, P <: AbstractParticleIntegrator}
   tracers::T
   particle_integration_scheme::P
+  shortened_first_steps::Bool
   traversal_mode::Symbol
 end
 
@@ -215,20 +220,22 @@ end
 function ParticleTracking(; number_of_particles::Integer, interpolation_scheme = CatmullRom,
                           unwrapped::Bool = false,
                           particle_integration_scheme::AbstractParticleIntegrator = Heun(),
+                          shortened_first_steps::Bool = false,
                           traversal_mode::Symbol = :automatic)
   number_of_particles > 0 ||
     throw(ArgumentError("`number_of_particles` must be positive, got $number_of_particles: a run " *
                         "without tracers is built without `particles`"))
   _check_traversal_mode(traversal_mode)
   return ParticleTracking(TracerSeeding(Int(number_of_particles), interpolation_scheme, unwrapped),
-                          particle_integration_scheme, traversal_mode)
+                          particle_integration_scheme, shortened_first_steps, traversal_mode)
 end
 
 function ParticleTracking(tracers::Tracers;
                           particle_integration_scheme::AbstractParticleIntegrator = Heun(),
+                          shortened_first_steps::Bool = false,
                           traversal_mode::Symbol = :automatic)
   _check_traversal_mode(traversal_mode)
-  return ParticleTracking(tracers, particle_integration_scheme, traversal_mode)
+  return ParticleTracking(tracers, particle_integration_scheme, shortened_first_steps, traversal_mode)
 end
 
 # Checked where it is named: a typo would otherwise be read as a mode, silently.
@@ -248,6 +255,7 @@ function Base.show(io::IO, particles::ParticleTracking)
     print(io, particles.tracers, "; ")
   end
   print(io, "particle_integration_scheme = ", particles.particle_integration_scheme,
+        ", shortened_first_steps = ", particles.shortened_first_steps,
         ", traversal_mode = ", repr(particles.traversal_mode), ")")
 end
 Base.show(io::IO, seeding::TracerSeeding) =
@@ -480,16 +488,16 @@ runs on, which holds partial values while a step is in flight and is read only b
 - `domain`, `buffers`, `generator`, `field_integration_scheme` — the `FixedDomain`, `IntegratorBuffers`,
   the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
   the chosen scheme.
-- `tracers`, `particle_integration_scheme`, `particle_buffers`, `particle_traversal` — the
+- `tracers`, `particle_integration_scheme`, `shortened_first_steps`, `particle_traversal` — the
   `Tracers` being advected along with the fields, the scheme advancing them along their
-  trajectories, that scheme's registers, and the
+  trajectories, whether the first timesteps are shortened for it, and the
   [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) the gathers
-  visit the tracers in (`nothing` under `traversal_mode = :none`). All `nothing` when the run carries no
-  tracers.
+  visit the tracers in (`nothing` under `traversal_mode = :none`). `nothing`, and `false`, when the
+  run carries no tracers.
 - `cfl`, `max_dt`, `clock` — the advective-CFL coefficient, the caller's ceiling on the adaptive
   step in the run's own time units (`Inf` when none), and the time/step counter.
 """
-struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB, PT}
+struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PT}
   domain::DOM
   buffers::FB
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
@@ -498,7 +506,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB, PT}
   cache::DF                # ObservablesCache: what the last iteration deposited, read between iterations
   tracers::TR              # Tracers, or nothing — trajectory STATE only
   particle_integration_scheme::PI  # AbstractParticleIntegrator, or nothing
-  particle_buffers::PB     # ParticleIntegratorBuffers for that scheme, or nothing
+  shortened_first_steps::Bool      # shorten the first timesteps while that scheme's trail fills
   particle_traversal::PT   # ParticleTraversal — the gathers' memory-locality order — or nothing (decision 86)
   cfl::Float64
   max_dt::Float64          # a ceiling on the adaptive step, in the caller's own units; Inf = none
@@ -903,24 +911,22 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
             particles.tracers isa Tracers ? particles.tracers :
             Tracers(domain; particles.tracers.number_of_particles,
                     particles.tracers.interpolation_scheme, particles.tracers.unwrapped, rng)
-  # The cache is built first: it carries the Lagrangian sample history a multistep particle integration scheme
-  # integrates over, so the scheme's registers are allocated against it.
-  cache = ObservablesCache(domain; scalar = carries_scalar,
-                           number_of_particles = tracers === nothing ? 0 : npoints(tracers.positions),
-                           history_depth = pscheme === nothing ? 1 : history_depth(pscheme))
-  particle_buffers = tracers === nothing ? nothing :
-                     allocate_buffers(pscheme, tracers, cache)
+  # The cache builds the trail of the velocity at the particles from the tracers, which size it, and
+  # the scheme, which fixes how many samples it keeps.
+  cache = ObservablesCache(domain; scalar = carries_scalar, tracers,
+                           particle_integration_scheme = pscheme)
   # The traversal order is on by default (decision 86): a value-preserving accelerator whose
   # every-iteration rebuild costs a small fraction of the gather it speeds up. `:manual` keeps it
   # resident and leaves the rebuild cadence to the caller's callback; `:none` allocates nothing.
   particle_traversal = (tracers === nothing || particles.traversal_mode === :none) ? nothing :
                        ParticleTraversal(domain, tracers; automatic = particles.traversal_mode === :automatic)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant the stopping criterion reads is t₀
-  tracers === nothing ||
-    deposit!(cache, tracers, velocity_physical(cache); traversal = particle_traversal)
+  # The trail's first sample, at the clock's starting time.
+  tracers === nothing || deposit!(cache, tracers, 0.0; traversal = particle_traversal)
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar = carries_scalar),
                     field_integration_scheme, state, cache,
-                    tracers, pscheme, particle_buffers, particle_traversal,
+                    tracers, pscheme, particles !== nothing && particles.shortened_first_steps,
+                    particle_traversal,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end
 
@@ -1016,6 +1022,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
   row("sim.max_dt", sim.max_dt)
   has_tracers && row("sim.tracers", sim.tracers)
   has_tracers && row("sim.particle_integration_scheme", sim.particle_integration_scheme)
+  has_tracers && row("sim.shortened_first_steps", sim.shortened_first_steps)
   row("current_time(sim), current_step(sim)", "$(current_time(sim)), $(current_step(sim))")
   print(io, "\nReadable in a `run!` callback (its argument named `sim`) without computation:")
   row("sim.state.velocity_spectral", "û — the velocity in spectral representation, the source of truth")
@@ -1024,7 +1031,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
   row("vorticity_physical(sim.cache)", "ω — the vorticity, likewise")
   has_scalar && row("scalar_physical(sim.cache)", "φ — the scalar, likewise")
   row("max_speed(sim.cache)", "maxᵢ|uᵢ| over the box, a host number, likewise")
-  has_tracers && row("velocity_at_particles(sim.cache)", "u at the tracers, an M × 3 array, likewise")
+  has_tracers && row("velocity_at_particles_trail(sim.cache)", "u at the tracers, its last few samples, likewise")
   has_tracers && row("sim.tracers.positions", "the tracers' positions, a PointSet (read via point_positions)")
   has_unwrapped && row("unwrapped_positions(sim.tracers)", "the unwrapped positions, a PointSet")
 end
@@ -1084,7 +1091,41 @@ function cfl_timestep(sim::Simulation)
                 max(conditions.viscosity, scalar_diffusivity(conditions))
   κ_min = 2π / Float64(sim.domain.grid.domain_size[1])
   resolution = 1 / (diffusivity * κ_min^2)
-  return min(advective, resolution, sim.max_dt)
+  return min(_startup_bound(sim, min(advective, resolution, sim.max_dt)), advective, resolution,
+             sim.max_dt)
+end
+
+
+# START-UP — the fourth bound, active only under `shortened_first_steps` and only for a particle
+# scheme that integrates over more than one sample. Such a scheme of order p starts with the
+# lower-order steps ABM(1), ABM(2), …, and the first, of local error (h/τ)³, dominates: τ is the time
+# over which the velocity changes along a trajectory — the Kolmogorov time √(ν/ε), the time scale of
+# the Lagrangian acceleration. For that error to be no larger than the full scheme's global error
+# (Δt/τ)^p at the step Δt the other bounds give, the first step is τ·(Δt/τ)^(p/3).
+#
+# From there the step may grow by no more than a fixed factor per iteration, back up to Δt. The
+# samples the scheme integrates over then sit at unevenly spaced times, and the polynomial through
+# unevenly spaced samples magnifies the errors they carry — the more so the higher the order. The
+# factors are measured, not derived (2026-11-15, a tracer in a linear straining flow with a known
+# trajectory): ×2 reaches the full order through order 5 and no further, ×1.5 through order 7, ×1.25
+# at order 8; they cost 2, 6–8 and 17 additional iterations.
+#
+# ε is measured from the state at the run's first step alone, and every later bound is read off the
+# trail's own times, so nothing is stored and a checkpoint taken mid-start-up continues it exactly.
+# The first-step rule ignores the error constants, so it holds to an order of magnitude.
+_startup_growth(order::Int) = order <= 5 ? 2.0 : order <= 7 ? 1.5 : 1.25
+
+function _startup_bound(sim::Simulation, Δt::Float64)
+  (sim.shortened_first_steps && _steps(sim.particle_integration_scheme) > 1) || return Inf
+  order = _order_of_accuracy(sim.particle_integration_scheme)
+  trail = velocity_at_particles_trail(sim.cache)
+  length(trail) > 1 && return _startup_growth(order) * (trail[0].time - trail[-1].time)
+  ν = sim.generator.conditions.viscosity
+  ε = Float64(_seeded_dissipation(sim.state, sim.domain, ν))
+  τ = sqrt(ν / ε)
+  # A flow at rest has no dissipation and no time scale: its velocity does not change along a
+  # trajectory, so there is nothing for a shorter step to resolve, and the bound is absent.
+  return (isfinite(τ) && τ > 0) ? τ * (Δt / τ)^(order / 3) : Inf
 end
 
 
@@ -1101,40 +1142,58 @@ clock's advance.
 # Arguments
 - `sim` — the [`Simulation`](@ref) to advance.
 - `dt = nothing` — pass a value to force a fixed step; `nothing` picks the adaptive step, the
-  smallest of the advective-CFL value for the current velocity, the longest mode's diffusive-decay
-  time (the bound the `Simulation` docstring states), and `max_dt`. A step that is not positive,
-  given or adaptive under a non-positive `cfl`, is an `ArgumentError`.
+  smallest of the bounds the `Simulation` docstring states and, under `shortened_first_steps`,
+  that setting's. A step that is not positive and finite is an `ArgumentError`, and so is a fixed
+  one under that setting.
 
-A velocity or scalar the step has made non-finite is an error naming the step, raised after the
-closing deposit, so a blown-up run never reports success.
+Tracers and fields left at different times are an `ErrorException`, before anything moves.
+A velocity or scalar the step has made non-finite is an error naming the step, after the
+closing deposit.
 
 Returns `sim`.
 """
 function advance!(sim::Simulation; dt = nothing)
-  # A step must be positive whichever route set it. `AdamsBashforth` already refuses a non-positive
-  # step where it would poison the sample history, but a one-step scheme silently no-ops on `dt = 0`
-  # and integrates backwards on a negative one, so the front door checks it for every scheme.
+  # A fixed step and the shortened start are two rules for the same steps, and silently honouring
+  # one of them would leave the other a setting that did nothing.
+  dt === nothing || !sim.shortened_first_steps || _steps(sim.particle_integration_scheme) == 1 ||
+    throw(ArgumentError("this run was built with `shortened_first_steps = true`, which chooses " *
+                        "the timestep itself while the particle scheme starts, and a fixed `dt` " *
+                        "was given: drop `dt`, or build the run without `shortened_first_steps`"))
+  # A step must be positive whichever route set it: the particle step already refuses a non-positive
+  # one, and the fields would silently no-op on `dt = 0` and integrate backwards on a negative one,
+  # so the front door checks it for every run.
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
   # Whichever route set it. Checking only the explicit `dt` left the ADAPTIVE branch — the default
   # one — unguarded: a negative `cfl` yields a negative Δt every step, and the integrating factor and
   # the RK stages are algebraically fine with it, so nothing throws, nothing goes NaN, and the run
   # marches BACKWARDS in time. A zero `cfl` freezes the clock while the step counter keeps climbing,
   # so a loop gated on the step count runs forever accumulating no simulated time.
-  Δt > 0 ||
-    throw(ArgumentError("the timestep must be positive, got $Δt" *
+  (isfinite(Δt) && Δt > 0) ||
+    throw(ArgumentError("the timestep must be positive and finite, got $Δt" *
                         (dt === nothing ? " from the adaptive CFL rule (check `cfl`)" : "")))
 
-  # The checked read at the iteration's start: the advance's v₁ must be the velocity sample the previous
-  # closing deposit deposited. They are consumed mid-iteration (after the step, as the solver's own scratch), so
-  # the epoch is verified here, at tₙ, where they are the current-epoch observable.
-  sim.tracers === nothing || velocity_at_particles(sim.cache)
+  # The checked read at the iteration's start. The particle step and its deposit check for
+  # themselves that the samples, the positions and the fields belong together, but they run after
+  # the field step: a refusal there would leave the fields advanced and the tracers not. Asked here,
+  # a run whose last tracer push was never closed, or whose fields were stepped alone, is refused
+  # whole, before anything has moved.
+  sim.tracers === nothing || trail_between_iterations(sim.cache)
+
+  # Computed once: the clock takes this number, and the new velocity sample is labelled with it, so
+  # the trail's newest time IS the clock's reading, bit for bit. A step too small to move the clock
+  # is refused here for the same reason as above: the new sample could not be told from the last.
+  t_new = sim.clock.time + Δt
+  t_new > sim.clock.time ||
+    throw(ArgumentError("the timestep $Δt is too small to advance the clock, which reads " *
+                        "$(sim.clock.time)"))
 
   step!(sim.field_integration_scheme, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
 
   # The closing deposit: fill every slot, at the new epoch, from the state the step just produced; the tracer
-  # push then completes its Heun pair — the head-checked sample as v₁, the just-deposited u(tₙ₊₁)
-  # interpolated at the predictor positions as v₂ — and the new sample is recorded at the new
-  # positions from the same deposited field, completing the iteration's deposits.
+  # push then integrates over the samples in the cache's trail, interpolating the just-deposited
+  # u(tₙ₊₁) at the positions it predicts when its scheme corrects, and the new sample is recorded at the new
+  # positions from the same deposited field, completing the iteration's deposits. The push checks for
+  # itself that the fields are exactly one step ahead of the positions.
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   if sim.tracers !== nothing
     # The traversal order is rebuilt from the START-of-step positions, before the push: the
@@ -1142,11 +1201,10 @@ function advance!(sim::Simulation; dt = nothing)
     # displacement stays inside the tiles it groups. Under `:manual` the callback owns the cadence.
     traversal = sim.particle_traversal
     (traversal !== nothing && traversal.automatic) && rebuild_traversal!(traversal, sim.domain, sim.tracers)
-    advect!(sim.particle_integration_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
-            sim.particle_buffers, Δt; traversal)
-    # `advect!` advanced the particles epoch itself (decision 76), so the previous sample already reads
-    # stale; the closing particle deposit refreshes it at the new positions.
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache); traversal)
+    advect!(sim.particle_integration_scheme, sim.tracers, sim.domain, sim.cache, Δt; traversal)
+    # `advect!` advanced the particles epoch itself (decision 76), so the trail already reads
+    # stale; the closing particle deposit adds the sample at the new positions.
+    deposit!(sim.cache, sim.tracers, t_new; traversal)
   end
   check_deposits(sim.cache)
 
@@ -1165,7 +1223,7 @@ function advance!(sim::Simulation; dt = nothing)
     isfinite(scalar_variance(sim.state.scalar_spectral)) ||
     error("non-finite scalar at step $(sim.clock.step + 1): the run appears to have blown up")
 
-  sim.clock.time += Δt
+  sim.clock.time = t_new
   sim.clock.step += 1
   return sim
 end
@@ -1617,8 +1675,8 @@ export write_simulation, read_simulation
 
 Checkpoint the run: write everything needed to restore `sim` (a [`Simulation`](@ref)) as one
 self-describing HDF5 group — the domain's parameters, the state in spectral representation, the
-tracer set, both forcing strategies, the viscosity and the Schmidt number, the Lagrangian sample
-history a multistep particle integration scheme integrates over, the scheme and timestep settings,
+tracer set, both forcing strategies, the viscosity and the Schmidt number, the earlier samples of
+the velocity at the particles, the scheme and timestep settings,
 and the clock. Nothing derivable is stored: the physical-representation observables, the current
 velocity sample, and every per-step buffer and transform plan are recomputed on read. A stochastic
 forcing's evolving state is part of the run's state and is stored with it, so continuation is exact
@@ -1643,11 +1701,12 @@ function write_simulation end
 
 Restore a run from the group [`write_simulation`](@ref) wrote. The [`Simulation`](@ref) is rebuilt
 through its own constructor from the recorded parameters, adopting the stored state rather than
-seeding one; the positions, the deposited observables, the Lagrangian sample history (a scheme
-of a different order keeps what fits and takes the missing first pushes under [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun)) and the clock follow. The
+seeding one; the positions, the deposited observables, the trail of the velocity at the particles
+and the clock follow. The
 next [`advance!`](@ref) continues the run, a stochastic forcing's realization included.
 
-A group not written by `write_simulation`, or written by a newer schema version, is refused with an
+A group not written by `write_simulation`, written by a newer schema version, or written with
+tracers before version 0.3 (it lacks the samples' times), is refused with an
 `ArgumentError`. Available once the `HDF5` package is loaded.
 
 # Arguments

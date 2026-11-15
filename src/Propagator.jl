@@ -151,7 +151,6 @@ end
 
 """
     allocate_buffers(scheme, domain; scalar = false) -> IntegratorBuffers
-    allocate_buffers(scheme, tracers, cache) -> ParticleIntegratorBuffers
 
 Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
 exactly its working set — never a register another scheme would use. A scheme with no method
@@ -159,27 +158,17 @@ here is a hard error; there is no over-allocating fallback. The constructor of
 a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) calls this for you.
 
 # Arguments
-- `scheme` — the concrete scheme dispatched on: an [`AbstractIntegrator`](@ref) in the field form,
-  an
-  [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator)
-  in the particle form.
-- `domain` — field form: the [`FixedDomain`](@ref), which fixes the grid, precision, and storage
+- `scheme` — the concrete scheme dispatched on, an [`AbstractIntegrator`](@ref).
+- `domain` — the [`FixedDomain`](@ref), which fixes the grid, precision, and storage
   backend of every register.
-- `scalar = false` — field form: `true` adds the nested `ScalarBuffers`, likewise sized to the
+- `scalar = false` — `true` adds the nested `ScalarBuffers`, likewise sized to the
   scheme.
-- `tracers` — particle form: the tracer set the registers are sized to.
-- `cache` — particle form: the
-  [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) whose
-  velocity-at-particles slot the scheme consumes and — for a multistep scheme — whose sample
-  history it integrates over.
 
-The first form builds the [`IntegratorBuffers`](@ref) the scheme needs:
+It builds the [`IntegratorBuffers`](@ref) the scheme needs:
 [`IFLowStorageRK3`](@ref), [`IFLowStorageRK4`](@ref) and [`IFSSPRK3`](@ref) allocate `stage1` and
 `nonlinear`; [`IFHeun`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. The
-second form builds the
-[`ParticleIntegratorBuffers`](@ref GBGHomogeneousTurbulence.Particles.ParticleIntegratorBuffers).
-One generic covers both because it is one concept, and because every side keeps the same
-separation: the evolving state holds no scheme's scratch.
+evolving state holds no scheme's scratch. A particle integration scheme has no registers of its
+own: it works on the positions and on the samples the observables cache keeps.
 """
 function allocate_buffers end
 
@@ -306,9 +295,8 @@ That limit is a factor ``1.93`` above the ``\\sqrt{3}`` of `IFLowStorageRK3`, an
 as many nonlinear evaluations. Every per-stage cost scales with the five stages alike, so a step costs
 ``5/3`` of `IFLowStorageRK3`'s, and a stability-limited run advances ``1.93/(5/3) \\approx 1.16``
 times the physical time per unit compute. Its fourth-order accuracy also removes the field's own time error as the limit on an
-[`AdamsBashforth(order = 4)`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) tracer,
-whose [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) bootstrap still caps its measured
-convergence near third order.
+[`AB(4)`](@ref GBGHomogeneousTurbulence.ParticlePropagator.AB) tracer,
+whose lower-order first steps still cap its measured convergence near third order.
 """
 struct IFLowStorageRK4 <: AbstractIntegrator end
 
@@ -762,7 +750,7 @@ _recovery_scratch(sb::ScalarBuffers) =
 
 """
     deposit!(cache, state, domain, buffers)
-    deposit!(cache, tracers, u; traversal = nothing)
+    deposit!(cache, tracers, t; traversal = nothing)
 
 Close a producer's advance (the step or the tracer push) by depositing the observables it has
 just made measurable: compute them
@@ -771,7 +759,7 @@ from the arguments, write them into `cache` (an
 the current epoch (the cache's freshness counter). One generic serves both sides of the run because
 it is one concept — each advance, of the fields or of the tracers, is followed by its own deposit, so an iteration
 closes as `step!` then `deposit!`, then
-[`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) then `deposit!` again.
+[`advect!`](@ref GBGHomogeneousTurbulence.ParticlePropagator.advect!) then `deposit!` again.
 
 # Arguments
 - `cache` — every form's destination: the cache whose slots receive the deposits.
@@ -782,11 +770,11 @@ closes as `step!` then `deposit!`, then
   which — dead at the iteration's end — is the recovery scratch.
 - `tracers` — particle form: the [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers) whose
   current positions are sampled, with the set's own interpolation scheme.
-- `u` — particle form: the velocity field in physical representation to interpolate — normally the
-  field form's own fresh deposit.
-- `traversal = nothing` — particle form: the visiting order of a
-  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) (its `order`
-  field) for the gather, or `nothing` for the tracers' own order; the values are identical either
+- `t` — particle form: the simulation time the new sample belongs to, later than the previous
+  sample's.
+- `traversal = nothing` — particle form: a
+  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal)
+  for the gather, or `nothing` for the tracers' own order; the values are identical either
   way.
 
 The field form deposits the field-derived slots — the velocity, vorticity and, when the run
@@ -796,23 +784,24 @@ is work the next iteration's first stage would have done anyway, so closing the 
 extra transforms — one extra pass only, the maximum-speed reduction, which runs every iteration
 even under a hand-fixed ``\\Delta t`` that never reads it.
 
-The particle form deposits the one trajectory-bound slot: it interpolates `u` at the tracer
-set's current positions and stamps the slot against both counters — the
-fields epoch, the version of the state the velocity was interpolated from, and the particles epoch,
-the version of the positions — since the
-velocity at the particles is a function of the two together. It therefore runs after the tracer
-push, which itself consumed the field form's deposit.
+The particle form adds one sample to the trail of the velocity at the particles: it interpolates
+the cache's own velocity at the tracer
+set's current positions and labels the sample with `t`. It therefore runs after the tracer
+push, which itself consumed the field form's deposit, and it refuses, with an `ErrorException`, a
+field and positions that belong to different times — the fields having taken a step the tracers
+have not — and a second sample at the same positions. The first sample of a trail is exempt, so
+the fields may be stepped alone before tracking starts. A time `t` that is not finite, or not later
+than the previous sample's, is an `ArgumentError`, as is a cache built without tracers.
 
 The deposited values serve twice: they are
-the Lagrangian velocity a caller accumulates, and the start-of-step velocity the next `advect!`
-reads — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint field would cost
+the Lagrangian velocity a caller accumulates, and what the next `advect!`
+integrates over — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint field would cost
 ``N^{3} \\times 3`` on a grid of ``N`` points per axis.
 
 Every iteration ends with these deposits: the run's
-[`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) performs them for you, the
+[`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) performs them for you, and the
 [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor makes the first
-deposits so the first iteration finds the initial state's observables, and a hand-run loop calls
-each form itself after the advance it closes.
+deposits so the first iteration finds the initial state's observables.
 
 Returns `cache`.
 """

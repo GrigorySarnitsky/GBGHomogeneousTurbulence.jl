@@ -16,8 +16,8 @@ using GBGHomogeneousTurbulence
 import GBGCodingTools
 
 const HT = GBGHomogeneousTurbulence
-const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Cache, HT.Forcing,
-                       HT.Generator, HT.Propagator, HT.Particles, HT.SimulationRun]
+const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Particles, HT.Cache, HT.Forcing,
+                       HT.Generator, HT.Propagator, HT.ParticlePropagator, HT.SimulationRun]
 const METHOD_BASELINE = TOML.parsefile(joinpath(@__DIR__, "method_parity_baseline.toml"))
 
 GBGCodingTools.TestHarness.method_parity(HT, OWNED_MODULES, METHOD_BASELINE)

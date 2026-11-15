@@ -331,11 +331,11 @@ second is evaluated at ``t_{n+1}``, at a predicted position the particle never
 reaches. Both are ``M\times3`` arrays, for ``M`` tracers, interpolated with the tracer set's scheme — a Catmull–Rom
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
-A multistep particle integration scheme looks further back, and the cache is where that history lives: built
-with `history_depth > 1` it keeps a bounded ring of past velocity samples —
-`history_depth - 1` further ``M\times3`` arrays beyond the current slot — which [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)
-integrates over. The history rides
-the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
+A multistep particle integration scheme looks further back, and the cache is where those samples live: the
+velocity at the particles is kept as a *trail*, its last few samples with their times — two for
+[`Heun`](@ref GBGHomogeneousTurbulence.ParticlePropagator.Heun), ``k`` for [`AB(k)`](@ref GBGHomogeneousTurbulence.ParticlePropagator.AB),
+``k + 1`` for [`ABM(k)`](@ref GBGHomogeneousTurbulence.ParticlePropagator.ABM), the values the update has alive at once.
+The earlier samples cannot be refilled from the state; they are the one place the cache holds more than the
 latest deposit.
 
 ### 2.4 What it caches
@@ -354,7 +354,7 @@ there is no moment to date it to, so no act between iterations builds it either.
 | ``\boldsymbol{\omega}`` | physical, grid | yes | the closing recovery; read by the advective-term assembly |
 | ``\varphi`` | physical, grid | yes | the closing recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity at the particles | ``M\times3`` at points | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
-| the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | kept only when a multistep particle integration scheme asks for depth; rotated at each sample deposit |
+| its earlier samples, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j \ge 1`` | ``M\times3`` each, the trail | yes | as many as the particle integration scheme works from, one at least; the oldest gives way to each new sample |
 | the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | the closing reduction over the cached velocity; read by the next timestep choice |
 | ``-\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u})``, dealiased | spectral, grid | no | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | not surviving, for the same reason as the row above |
@@ -409,8 +409,8 @@ iteration, and the criterion's return decides continuation. The accessors [`velo
 and [`scalar_physical`](@ref) return the
 deposited field, and [`max_speed`](@ref) the deposited number — each a checked read that throws when
 no deposit is current. The closing [`deposit!`](@ref) ends an iteration (the run layer's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) calls it
-after every step; the `Simulation` constructor makes the seeding deposit). The accessor [`velocity_at_particles`](@ref) returns the velocity sampled at the
-particle positions — a cached read like the fields' — and [`interpolate_at_particles!`](@ref) interpolates any physical field at the
+after every step; the `Simulation` constructor makes the seeding deposit). The accessor [`velocity_at_particles_trail`](@ref) returns the trail of the velocity sampled at the
+particle positions — a cached read like the fields', current while the positions have not moved — and [`interpolate_at_particles!`](@ref) interpolates any physical field at the
 particle positions.
 
 ```julia
@@ -419,17 +419,17 @@ domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π,
                      array_family = Array)
 cache  = ObservablesCache(domain; scalar = true)   # the slots follow the configuration
 
-# With tracers, the cache allocates the velocity-at-particles slot, sized by the count.
+# With tracers, the cache allocates the trail of the velocity at them, sized by the scheme.
 # The interpolation scheme comes from the field library, not from this package:
 using GBGPeriodicFields: CatmullRom
 tracers = Tracers(domain; number_of_particles = 1024, interpolation_scheme = CatmullRom)
-cache   = ObservablesCache(domain; scalar = true, number_of_particles = 1024)
+cache   = ObservablesCache(domain; scalar = true, tracers, particle_integration_scheme = Heun())
 ```
 
 ### 3.2 Coverage — the page against the code
 
 The cache itself is built as §§1–2 describe: automatic contents, closing deposits recorded at the new
-epoch — the velocity sample included, against both epochs — three-valued slot epochs that
+epoch — the velocity sample included, against the particles epoch — three-valued slot epochs that
 throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the
 deposit-completeness check, and each slot doubling as its producer's register. The loop is §1.3's:
 `run!(callback, sim)` calls the stopping criterion `callback` once before the first iteration and after every one — ``n`` iterations, ``n + 1``

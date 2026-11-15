@@ -15,9 +15,9 @@ using Random
   # Control 1: with particles asked for, the requested scheme is honoured.
   with_particles = Simulation(grid_points_per_axis = 16,
                               particles = ParticleTracking(number_of_particles = 4,
-                                                           particle_integration_scheme = AdamsBashforth(order = 4)),
+                                                           particle_integration_scheme = AB(4)),
                               rng = MersenneTwister(1))
-  @test with_particles.particle_integration_scheme isa AdamsBashforth
+  @test with_particles.particle_integration_scheme isa AB
 
   # Control 2: the untouched default (no particle_integration_scheme, no particles) stays a legal,
   # silent, tracer-free run — a guard must not over-throw on it.
@@ -28,6 +28,6 @@ using Random
   # inside `ParticleTracking`, which always carries a tracer set, so the request cannot be written
   # for a tracer-free run: `Simulation` has no such keyword.
   @test_throws MethodError Simulation(grid_points_per_axis = 16,
-                                      particle_integration_scheme = AdamsBashforth(order = 4),
+                                      particle_integration_scheme = AB(4),
                                       rng = MersenneTwister(1))
 end

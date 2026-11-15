@@ -10,6 +10,8 @@ using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test
 
+include(joinpath(@__DIR__, "..", "prescribed_flow.jl"))
+
 set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx); uf)
 
 @testset "advect! returns tracer positions strictly inside [0, L)" begin
@@ -18,7 +20,6 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
                        dealiasing = TwoThirds(), array_family = Array)
-  u = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
   @testset "physically-sized velocity, coordinate cancelling to a sub-ULP negative" begin
     # dt * v₁ = -1.0e-3 exactly; starting x = prevfloat(1.0e-3), so the Sterbenz-exact difference is
@@ -26,11 +27,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     dt = 1.0e-3
     X0 = T[prevfloat(1.0e-3) 1.0 1.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
-    buffers = allocate_buffers(Heun(), tracers, cache)
-    set_uniform_x!(u, -1.0)
-    deposit!(cache, tracers, u)
-    advect!(Heun(), tracers, u, domain, buffers, dt)
+    cache = ObservablesCache(domain; tracers, particle_integration_scheme = Heun())
+    advect_in_prescribed_flow!((u, t) -> set_uniform_x!(u, -1.0), Heun(), tracers, domain, cache, (dt,))
     X = point_positions(tracers.positions)
     @test all(0 .<= X)
     @test all(X .< L)
@@ -40,11 +38,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     dt = 1.0
     X0 = T[0.0 1.0 1.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
-    buffers = allocate_buffers(Heun(), tracers, cache)
-    set_uniform_x!(u, -1.0e-20)
-    deposit!(cache, tracers, u)
-    advect!(Heun(), tracers, u, domain, buffers, dt)
+    cache = ObservablesCache(domain; tracers, particle_integration_scheme = Heun())
+    advect_in_prescribed_flow!((u, t) -> set_uniform_x!(u, -1.0e-20), Heun(), tracers, domain, cache, (dt,))
     X = point_positions(tracers.positions)
     @test all(X .< L)
   end

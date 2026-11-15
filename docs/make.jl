@@ -62,6 +62,7 @@ GBGCodingTools.makedocs(ROOT;
     GBGHomogeneousTurbulence.Generator,
     GBGHomogeneousTurbulence.Propagator,
     GBGHomogeneousTurbulence.Particles,
+    GBGHomogeneousTurbulence.ParticlePropagator,
     GBGHomogeneousTurbulence.SimulationRun,
   ],
   format = Documenter.HTML(
@@ -94,6 +95,7 @@ GBGCodingTools.makedocs(ROOT;
       "Generator"              => "api/Generator.md",
       "Propagator"             => "api/Propagator.md",
       "Particles"              => "api/Particles.md",
+      "ParticlePropagator"     => "api/ParticlePropagator.md",
     ],
     "Memory footprint"  => "gpu.md",
     "Validation" => "validation.md",

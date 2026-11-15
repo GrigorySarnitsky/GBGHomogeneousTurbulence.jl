@@ -109,7 +109,7 @@ leg) for ~100 steps so AB4 runs at full order with authentic history. Handoff = 
 vorticity + `tracers0/state` + `tracers0/rhs` (4-slot history; NSVEparticles reads
 `/tracers0/rhs/<iter>` natively on restart — verified in source, and the convergence tutorial
 hand-builds ICs this way). The converter (still postponed) additionally imports positions + the
-rhs history into HT's ParticleIntegratorBuffers; rhs slot ordering must be pinned by the
+rhs history into the trail of the velocity at the particles in HT's observables cache; rhs slot ordering must be pinned by the
 round-trip witness, not assumed. VACF: neither code computes it in-run — TurTLE samples
 position/velocity per `niter_part` into `<simname>_particles.h5`; ONE shared post-hoc script
 computes the Lagrangian VACF identically for both legs. The docs skeleton is

@@ -93,13 +93,13 @@ const CONFIGURATIONS = [
   ("Linear", (velocity_forcing = Linear(rate = 0.1),)),
   ("StochasticOU", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5),)),
   ("tracers", (particles = ParticleTracking(number_of_particles = 4096),)),
-  # the scaling axes beyond N: the tracer count M, the multistep order K, the stochastic band
+  # the scaling axes beyond N: the tracer count M, the multistep scheme's number of samples, the stochastic band
   ("tracers M = 32768", (particles = ParticleTracking(number_of_particles = 32768),)),
   ("tracers M = 262144", (particles = ParticleTracking(number_of_particles = 262144),)),
-  ("AdamsBashforth K = 2", (particles = ParticleTracking(number_of_particles = 4096,
-                                                        particle_integration_scheme = AdamsBashforth(order = 2)),)),
-  ("AdamsBashforth K = 4", (particles = ParticleTracking(number_of_particles = 4096,
-                                                        particle_integration_scheme = AdamsBashforth(order = 4)),)),
+  ("AB(2)", (particles = ParticleTracking(number_of_particles = 4096,
+                                                        particle_integration_scheme = AB(2)),)),
+  ("AB(4)", (particles = ParticleTracking(number_of_particles = 4096,
+                                                        particle_integration_scheme = AB(4)),)),
   ("StochasticOU band 1–4", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
                                                              highest_shell = 4),)),
   ("StochasticOU band 1–8", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
@@ -172,7 +172,7 @@ const DEVICE_TEMPORARIES = Dict(
   "Simulation/scalar" => 4.0,            # …and the scalar's
   "derivative_skewness" => 18.3,         # FULL STRAIN TENSORS
   "read_simulation" => 2.6,              # the domain it builds, and the restore's small arrays
-  "Simulation/AdamsBashforth order 4" => 3.0,   # the noise vector; the order adds nothing
+  "Simulation/AB(4)" => 3.0,   # the noise vector; the order adds nothing
   "Simulation/StochasticOU band 1–8" => 3.0,    # the noise vector; the band's own noise is small
 )
 const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small arrays vary with N
@@ -202,9 +202,9 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
         "Simulation/scalar" => () -> Simulation(d; viscosity = 0.05, scalar = PassiveScalar(), rng = Xoshiro(1)),
         "derivative_skewness" => () -> derivative_skewness(û, d),
         "read_simulation" => () -> h5open(f -> read_simulation(f, "run"; array_family = cu), path, "r"),
-        "Simulation/AdamsBashforth order 4" => () -> Simulation(d; viscosity = 0.05,
+        "Simulation/AB(4)" => () -> Simulation(d; viscosity = 0.05,
                                                                 particles = ParticleTracking(number_of_particles = 64,
-                                                                                             particle_integration_scheme = AdamsBashforth(order = 4)),
+                                                                                             particle_integration_scheme = AB(4)),
                                                                 rng = Xoshiro(1)),
         "Simulation/StochasticOU band 1–8" => () -> Simulation(d; viscosity = 0.05, rng = Xoshiro(1),
             velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
@@ -271,7 +271,7 @@ end
     for T in (Float32, Float64)
       d = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
                       array_family = cu)
-      for scheme in (Heun(), AdamsBashforth(order = 4))
+      for scheme in (Heun(), AB(4))
         t = map(DEVICE_TRACER_COUNTS) do M
           device_transient_bytes(p, () -> Simulation(d; viscosity = 0.05,
                                                      particles = M == 0 ? nothing :

@@ -23,8 +23,8 @@ using GBGHomogeneousTurbulence
 import GBGCodingTools
 
 const HT = GBGHomogeneousTurbulence
-const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Cache, HT.Forcing,
-                       HT.Generator, HT.Propagator, HT.Particles, HT.SimulationRun]
+const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Particles, HT.Cache, HT.Forcing,
+                       HT.Generator, HT.Propagator, HT.ParticlePropagator, HT.SimulationRun]
 
 # operation => (class, where the strongest oracle lives)
 const ORACLE_PROVENANCE = Dict{Symbol, Tuple{Symbol, String}}(
@@ -72,6 +72,8 @@ const ORACLE_PROVENANCE = Dict{Symbol, Tuple{Symbol, String}}(
   :read_state            => (:property, "hdf5_checkpoint.jl — reads back what was written, bit for bit"),
   :write_tracers         => (:property, "hdf5_checkpoint.jl — written then read back bit for bit"),
   :read_tracers          => (:property, "hdf5_checkpoint.jl — reads back what was written, bit for bit"),
+  :write_trail           => (:property, "hdf5_checkpoint.jl — written then read back: capacity, times and values, bit for bit"),
+  :read_trail            => (:property, "hdf5_checkpoint.jl — reads back what was written, bit for bit"),
   :write_forcing         => (:property, "hdf5_checkpoint.jl — written then rebuilt with the same parameters"),
   :read_forcing          => (:property, "hdf5_checkpoint.jl — rebuilds the forcing that was written"),
   :write_simulation      => (:property, "hdf5_checkpoint.jl — a restored run continues bitwise as the uninterrupted one"),
@@ -91,9 +93,18 @@ const ORACLE_PROVENANCE = Dict{Symbol, Tuple{Symbol, String}}(
   :velocity_physical     => (:structural, "reads a cache slot's storage"),
   :vorticity_physical    => (:structural, "reads a cache slot's storage"),
   :scalar_physical       => (:structural, "reads a cache slot's storage"),
-  :velocity_at_particles => (:structural, "reads a cache slot's storage"),
+  :velocity_at_particles_trail => (:structural, "reads the cache's trail of samples"),
   :unwrapped_positions   => (:structural, "returns the tracers' unwrapped position record"),
-  :history_depth         => (:structural, "a scheme's number of past samples, metadata"),
+  # a trail as a collection: which sample an offset names, written out in the test
+  :getindex              => (:independent, "particles.jl — the times and values pushed, read back by offset: the newest at 0, the one before at −1"),
+  :iterate               => (:independent, "particles.jl — the times pushed, oldest to newest, the dropped ones gone"),
+  :length                => (:independent, "particles.jl — the count pushed, capped at the capacity"),
+  :isempty               => (:independent, "particles.jl — true before the first sample"),
+  :firstindex            => (:independent, "particles.jl — one less the count, negated: −2 for three samples"),
+  :lastindex             => (:independent, "particles.jl — zero, the newest"),
+  :keys                  => (:independent, "particles.jl — −2:0 for three samples"),
+  :eltype                => (:structural, "the type of a sample, metadata"),
+  :time_derivative       => (:analytic, "particles.jl — exact on a polynomial through uneven times, every order through the fourth; order d − m in the spacing on sin t"),
   :steady_linear_rate    => (:independent, "forcing.jl — A on the band and zero elsewhere, on exactly the band's modes; every mode but the mean for an unbounded band"),
   :show                  => (:structural, "a display, gated in display.jl"),
 )

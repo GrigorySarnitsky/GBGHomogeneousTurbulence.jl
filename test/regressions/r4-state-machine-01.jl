@@ -1,22 +1,21 @@
-# Witness for the claim: "`advect!` reads the velocity-at-particles slot by direct array access,
-# bypassing the cache's checked accessor, so it silently consumes a sample the cache itself
-# considers stale."
+# Witness for the claim: "`advect!` reads the velocity sample by direct array access, bypassing the
+# cache's checked accessor, so it silently consumes a sample the cache itself considers stale."
 #
-# The correct behaviour this file asserts is the one the code and its docstrings actually promise:
-# the start-of-step velocity v₁ is CONSUMED MID-ITERATION, after the step has advanced the fields
-# epoch, and the value sitting in `tracers.velocity_at_particles` at that moment is exactly
-# u(tₙ, X(tₙ)) — the right v₁ for the step just taken. `advance!` verifies its freshness at tₙ (its
-# opening `velocity_at_particles(sim.cache)` guard) precisely because the later read cannot be checked:
-# the cache's "stale" flag is by design raised between the step and the closing particle `deposit!`,
-# and `advance!` itself calls `advect!` in exactly that window.
+# When the claim was made, the sample was dated against the fields epoch as well as the particles
+# epoch, so the read `advect!` makes mid-iteration — after the field step — could not go through the
+# checked accessor, and `advance!` verified the sample at the iteration's start instead. The claim
+# was answered by showing that the value consumed was the correct one.
+#
+# Since 2026-11-15 the question does not arise: a sample is u(t, X(t)) and belongs to the particles'
+# time, so it is CURRENT in that window — the positions have not moved — and `advect!` reads it
+# through a checked read of its own, which also requires the fields exactly one step ahead.
 #
 # So the assertions are:
-#   (1) the run layer refuses to advance on a genuinely stale sample (the guard exists and fires);
-#   (2) the hand-composed sequence the claim calls a "scheduling violation" — step!/deposit!/advect!,
-#       with the cache reporting the sample stale in between — advances the trajectories to exactly
-#       the positions `advance!` produces, i.e. the value `advect!` consumed was the correct v₁ and
-#       nothing was silently corrupted.
-# If (2) ever fails, the mid-iteration read really did consume a wrong value and the claim is real.
+#   (1) the run layer refuses to advance on a cache whose fields were stepped and not deposited;
+#   (2) in the hand-composed sequence step!/deposit!/advect!/deposit!, the trail is readable between
+#       the field deposit and the push, with the samples it had before the step, and the sequence
+#       advances the trajectories to exactly the positions `advance!` produces.
+# If (2) ever fails, the mid-iteration read consumed a wrong value.
 
 using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.Cache: advance_fields_epoch!
@@ -33,14 +32,14 @@ function fresh_sim(seed)
 end
 
 
-@testset "the mid-iteration velocity-at-particles read consumes the correct v₁" begin
+@testset "the mid-iteration velocity-at-particles read consumes the correct sample" begin
   dt = 0.002
 
-  # ————— (1) the run layer's guard on a genuinely stale sample —————
+  # ————— (1) the run layer's refusal of an iteration left open —————
   guarded = fresh_sim(1)
   advance!(guarded; dt = dt)
-  advance_fields_epoch!(guarded.cache)          # a step's epoch advance with no closing deposit: the sample is now stale
-  @test_throws ErrorException velocity_at_particles(guarded.cache)
+  advance_fields_epoch!(guarded.cache)          # a step's epoch advance with no closing deposit
+  @test_throws ErrorException velocity_physical(guarded.cache)
   @test_throws ErrorException advance!(guarded; dt = dt)
 
   # ————— (2) the hand-composed iteration —————
@@ -50,18 +49,22 @@ end
 
   manual = fresh_sim(1)
   advance!(manual; dt = dt)                     # same genuine sample
+  sample_before = copy(point_values(velocity_at_particles_trail(manual.cache)[0].value))
 
-  # The claim's own sequence: step + deposit, then read the slot directly through `advect!`.
   step!(manual.field_integration_scheme, manual.state, manual.generator, manual.domain, manual.buffers, manual.cache, dt)
   deposit!(manual.cache, manual.state, manual.domain, manual.buffers)
 
-  # The cache reports the sample stale here — this is the window `advance!` also advects in.
-  @test_throws ErrorException velocity_at_particles(manual.cache)
+  # The window `advance!` also advects in: the fields are one step ahead, the positions unmoved,
+  # and the trail still serves u(tₙ, X(tₙ)).
+  @test point_values(velocity_at_particles_trail(manual.cache)[0].value) == sample_before
 
-  advect!(manual.particle_integration_scheme, manual.tracers, velocity_physical(manual.cache), manual.domain,
-          manual.particle_buffers, dt)
+  advect!(manual.particle_integration_scheme, manual.tracers, manual.domain, manual.cache, dt)
+  @test_throws ErrorException velocity_at_particles_trail(manual.cache)     # now the positions have moved
+  deposit!(manual.cache, manual.tracers, current_time(manual) + dt)
 
-  # The decisive assertion: the "stale" value consumed was the correct u(tₙ, X(tₙ)), so the
-  # trajectories land exactly where the guarded run layer puts them.
+  # The decisive assertion: the value consumed was the correct u(tₙ, X(tₙ)), so the trajectories
+  # land exactly where the run layer puts them — and so does the new sample.
   @test point_positions(manual.tracers.positions) == point_positions(reference.tracers.positions)
+  @test point_values(velocity_at_particles_trail(manual.cache)[0].value) ==
+        point_values(velocity_at_particles_trail(reference.cache)[0].value)
 end

@@ -57,7 +57,7 @@
 
 using GBGHomogeneousTurbulence
 using InteractiveUtils: subtypes
-using GBGPeriodicFields: point_positions
+using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: field_data, materialize_kernel, ScalarFieldSpectral
 using Test
 
@@ -384,7 +384,7 @@ const SYNC_LEDGER = (
     # …including the point-value buffers, which is where a retained field would have to hide: the
     # recorded start-of-step velocity is M interpolated vectors, read back through the public readout.
     @test size(point_positions(sim.tracers.positions)) == (tracer_count, 3)
-    @test size(velocity_at_particles(sim.cache)) == (tracer_count, 3)
+    @test npoints(velocity_at_particles_trail(sim.cache)[0].value) == tracer_count
 
     # (b) An unforced field carries no linear-rate array: the storage tracks the physics.
     unforced = ResolvedGenerator(domain, FlowConditions(; viscosity = 0.1, schmidt = 1.0,

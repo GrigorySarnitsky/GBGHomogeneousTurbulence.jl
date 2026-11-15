@@ -25,22 +25,10 @@ count = 1
 module = "SimulationRun"
 
 [[generic]]
-set = "Particles"
-name = "advect!"
-count = 2
-module = "Particles"
-
-[[generic]]
 set = "Propagator"
 name = "allocate_buffers"
 count = 4
 module = "Propagator"
-
-[[generic]]
-set = "Particles"
-name = "allocate_buffers"
-count = 2
-module = "Particles"
 
 [[generic]]
 set = "Forcing"
@@ -65,12 +53,6 @@ set = "Propagator"
 name = "deposit!"
 count = 1
 module = "Propagator"
-
-[[generic]]
-set = "Particles"
-name = "deposit!"
-count = 1
-module = "Particles"
 
 [[generic]]
 set = "Observables"
@@ -107,12 +89,6 @@ set = "Generator"
 name = "finalize!"
 count = 1
 module = "Generator"
-
-[[generic]]
-set = "Particles"
-name = "history_depth"
-count = 2
-module = "Particles"
 
 [[generic]]
 set = "Forcing"
@@ -405,7 +381,7 @@ module = "Propagator"
 [[generic]]
 set = "Particles"
 name = "show"
-count = 5
+count = 4  # −2 +1 (2026-11-15): the scheme and the buffers displays left with them (the schemes to ParticlePropagator), and `ParticleTrail` brought its own
 module = "Particles"
 
 [[generic]]
@@ -431,12 +407,6 @@ set = "Particles"
 name = "unwrapped_positions"
 count = 1
 module = "Particles"
-
-[[generic]]
-set = "Cache"
-name = "velocity_at_particles"
-count = 1
-module = "Cache"
 
 [[generic]]
 set = "Generator"
@@ -474,13 +444,104 @@ name = "warmup!"
 count = 1
 module = "SimulationRun"
 
+[[generic]]
+set = "ParticlePropagator"
+name = "advect!"
+count = 1  # (2026-11-15) one step for every scheme, where `Particles` had one per scheme; moved with the schemes
+module = "ParticlePropagator"
+
+[[generic]]
+set = "ParticlePropagator"
+name = "deposit!"
+count = 1  # (2026-11-15) the particle form, moved with the schemes
+module = "ParticlePropagator"
+
+[[generic]]
+set = "ParticlePropagator"
+name = "show"
+count = 2  # (2026-11-15) `AB` and `ABM`, the latter printing `Heun()` for one step
+module = "ParticlePropagator"
+
+[[generic]]
+set = "Particles"
+name = "time_derivative!"
+count = 1  # (2026-11-15) new with `ParticleTrail`
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "time_derivative"
+count = 1  # (2026-11-15) new with `ParticleTrail`
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "push!"
+count = 3  # (2026-11-15) the trail's write, and the two forms a reader of Base's would try, refused with the reason
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "getindex"
+count = 1  # (2026-11-15) a trail is read by offset from its newest sample
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "length"
+count = 1  # (2026-11-15) the trail as a collection
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "isempty"
+count = 1  # (2026-11-15) the trail as a collection
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "firstindex"
+count = 1  # (2026-11-15) the trail as a collection
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "lastindex"
+count = 1  # (2026-11-15) the trail as a collection
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "keys"
+count = 1  # (2026-11-15) the trail as a collection
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "eltype"
+count = 1  # (2026-11-15) the trail as a collection
+module = "Particles"
+
+[[generic]]
+set = "Particles"
+name = "iterate"
+count = 2  # (2026-11-15) the trail as a collection: one method, counted with its default argument
+module = "Particles"
+
+[[generic]]
+set = "Cache"
+name = "velocity_at_particles_trail"
+count = 1  # (2026-11-15) the read of the trail, in place of `velocity_at_particles`
+module = "Cache"
+
 [module]
 SimulationDomain = 25
 Observables = 21  # +1 (2026-10-16): `scalar_variance_and_dissipation`, the scalar twin of the fused velocity pair; +4 the same day: `integral_length(spectrum)`, `taylor_length`, `kolmogorov_time`, `kolmogorov_velocity` (decision 114)
 State = 8  # +1 (2026-11-06): `_peak_wavenumber`, the seed's κ_p from its shell in units of 2π/L (decision 117); +1 (2026-11-06): `_seed_envelope`, the one envelope both seeders share (decision 119)
-Cache = 21  # −2 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state
+Cache = 27  # +6 (2026-11-15, decision 121): the trail's side of the cache (its checked reads for the particle step and for the start of an iteration, the scratch slot, the deposit, the checkpoint's reset and restore) in place of the old stamping call; −2 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state
 Forcing = 77  # +3 (2026-10-14): the deferred display's `_run_filled` (6) and `_either_or` (2) replace `_design_keyword` (5)
 Generator = 25
 Propagator = 22
-Particles = 21  # −2 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state; +2 (2026-10-14): `_order`, the two methods unwrapping a `ParticleTraversal` for the gathers (moved from SimulationRun)
-SimulationRun = 44  # +1 (2026-11-06): `_check_reality`, the adopted state's real-field check; −4 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state; −1 (2026-10-15): `flow_parameters` left the run layer, which no longer reaches the Phenomenology leaf (decision 112); +1 (2026-10-14): `_turnover_time`, the flow's 2k/(3ε) a controller takes; +3 (2026-10-14): `ParticleTracking`'s two constructors and `_check_traversal_mode`; +1 (2026-10-14): `PassiveScalar`'s keyword constructor; +2 (2026-10-14): `_seeded`, the two methods filling a deferred `StochasticOU` seed from the run's rng; −2 (2026-10-14): `_traversal_order` moved to Particles as `_order`; +1 (2026-10-12): `_predicted_stationary_state`, the Float64 prediction the public one converts to the domain's element type
+ParticlePropagator = 14  # new (2026-11-15, decision 121): the particle schemes `AB` and `ABM`, their weights and their one step, split from Particles to load after the cache
+Particles = 35  # +14 (2026-11-15, decision 121): `ParticleTrail` with its collection interface, `push!` and `time_derivative`, less the schemes, their step and their buffers, which left for ParticlePropagator or went away; −2 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state; +2 (2026-10-14): `_order`, the two methods unwrapping a `ParticleTraversal` for the gathers (moved from SimulationRun)
+SimulationRun = 46  # +2 (2026-11-15, decision 121): `_startup_bound` and `_startup_growth`, the timestep bound of `shortened_first_steps`; +1 (2026-11-06): `_check_reality`, the adopted state's real-field check; −4 (2026-11-06): a run is changed by building a new `Simulation` that adopts its state; −1 (2026-10-15): `flow_parameters` left the run layer, which no longer reaches the Phenomenology leaf (decision 112); +1 (2026-10-14): `_turnover_time`, the flow's 2k/(3ε) a controller takes; +3 (2026-10-14): `ParticleTracking`'s two constructors and `_check_traversal_mode`; +1 (2026-10-14): `PassiveScalar`'s keyword constructor; +2 (2026-10-14): `_seeded`, the two methods filling a deferred `StochasticOU` seed from the run's rng; −2 (2026-10-14): `_traversal_order` moved to Particles as `_order`; +1 (2026-10-12): `_predicted_stationary_state`, the Float64 prediction the public one converts to the domain's element type

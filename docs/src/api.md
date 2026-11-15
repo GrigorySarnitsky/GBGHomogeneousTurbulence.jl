@@ -14,7 +14,8 @@ composes follow. The umbrella re-exports the public surface of every submodule, 
 - [Forcing](api/Forcing.md): the interchangeable energy-injection strategies under [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing), chosen independently for the velocity and the scalar.
 - [Generator](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes right-hand side, the passive-scalar advection, and the exact viscous integrating factor — gathered into one object, the [`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator), which a scheme consumes through a fixed set of functions.
 - [Propagator](api/Propagator.md): the integrating-factor time-stepping schemes under [`AbstractIntegrator`](@ref GBGHomogeneousTurbulence.Propagator.AbstractIntegrator) — the low-storage [`IFLowStorageRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK3) and [`IFLowStorageRK4`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK4), the Shu–Osher [`IFSSPRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFSSPRK3), and [`IFHeun`](@ref GBGHomogeneousTurbulence.Propagator.IFHeun) (Heun).
-- [Particles](api/Particles.md): Lagrangian tracking of massless [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers): [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) moves them under a selectable scheme ([`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) by default, or [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)), and [`interpolate_at_particles!`](@ref GBGHomogeneousTurbulence.Particles.interpolate_at_particles!) samples fields at their positions.
+- [Particles](api/Particles.md): the massless [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers) and what is measured at them: [`interpolate_at_particles!`](@ref GBGHomogeneousTurbulence.Particles.interpolate_at_particles!) samples fields at their positions, and a [`ParticleTrail`](@ref GBGHomogeneousTurbulence.Particles.ParticleTrail) keeps a quantity's last few samples for its time derivative along the trajectories.
+- [ParticlePropagator](api/ParticlePropagator.md): the schemes that advance the tracers under [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.ParticlePropagator.AbstractParticleIntegrator) — [`Heun`](@ref GBGHomogeneousTurbulence.ParticlePropagator.Heun) by default, the multistep [`AB`](@ref GBGHomogeneousTurbulence.ParticlePropagator.AB), and its corrected form [`ABM`](@ref GBGHomogeneousTurbulence.ParticlePropagator.ABM) — and the step, [`advect!`](@ref GBGHomogeneousTurbulence.ParticlePropagator.advect!).
 
 ```@contents
 Pages = [
@@ -28,6 +29,7 @@ Pages = [
   "api/Generator.md",
   "api/Propagator.md",
   "api/Particles.md",
+  "api/ParticlePropagator.md",
 ]
 Depth = 2
 ```

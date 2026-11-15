@@ -9,15 +9,16 @@
 
 using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence: SimulationDomain, State, Observables, Cache, Forcing, Generator,
-                              Propagator, Particles, SimulationRun
-using GBGHomogeneousTurbulence.Particles: advect!, unwrapped_positions
+                              Propagator, Particles, ParticlePropagator, SimulationRun
+using GBGHomogeneousTurbulence.Particles: unwrapped_positions
+using GBGHomogeneousTurbulence.ParticlePropagator: advect!
 using GBGPeriodicFields: field_data, point_positions, npoints, LalescuSpline
 using Random
 using Test
 
 
 const MODULES = Set(Any[GBGHomogeneousTurbulence, SimulationDomain, State, Observables, Cache, Forcing,
-                        Generator, Propagator, Particles, SimulationRun])
+                        Generator, Propagator, Particles, ParticlePropagator, SimulationRun])
 
 # Types that deliberately carry no display, each with the reason. Every one is a flat record of
 # numbers whose default display — its positional constructor call, module-qualified when the name
@@ -46,7 +47,7 @@ function package_struct_types()
     base isa DataType || continue
     base.name.module in MODULES || continue
     # An empty NON-parametric struct is a singleton whose default `Name()` is its constructor. An
-    # empty parametric one is not: its content lives in the type parameter (`AdamsBashforth{K}`),
+    # empty parametric one is not: its content lives in the type parameter (`AB{k}`),
     # so the default would spell it `Module.Name{3}()`, and it is enumerated like any other.
     isabstracttype(base) && continue
     isempty(fieldnames(base)) && !(object isa UnionAll) && continue
@@ -83,7 +84,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     end
 
     # Falsified by perturbation: a planted empty-but-parametric struct is enumerated (the shape
-    # `AdamsBashforth{K}` has, whose default would print `Module.Name{3}()`), so it cannot ship
+    # `AB{k}` has, whose default would print `Module.Name{3}()`), so it cannot ship
     # without a display or an exemption.
     @eval Particles struct _PlantedOrderTag{K} end
     @test haskey(package_struct_types(), :_PlantedOrderTag)
@@ -97,7 +98,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
   sim = Simulation(domain; viscosity = 0.05,
                    scalar = PassiveScalar(forcing = VarianceRescaling(target = 0.5, over = :band)),
                    particles = ParticleTracking(number_of_particles = M,
-                                                particle_integration_scheme = AdamsBashforth(order = 3)),
+                                                particle_integration_scheme = AB(3)),
                    velocity_forcing = ConstantPower(injection_rate = 0.1))
   tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = LalescuSpline(4),
                     rng = MersenneTwister(1))
@@ -109,8 +110,8 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # its monitor — get the wider budget the nesting costs.
     leaves = Any[
       domain, sim.state, sim.cache, sim.tracers, sim.buffers, sim.buffers.scalar,
-      sim.generator.phase_shift, sim.particle_buffers, sim.particle_traversal, sim,
-      HouLi(), HouLi(order = 24, strength = 30, materialized = true), AdamsBashforth(order = 3),
+      sim.generator.phase_shift, velocity_at_particles_trail(sim.cache), sim.particle_traversal, sim,
+      HouLi(), HouLi(order = 24, strength = 30, materialized = true), AB(3), ABM(3), Heun(),
       ConstantPower(domain; injection_rate = 0.1), Linear(domain; rate = 0.5),
       VarianceRescaling(domain; target = 0.5, over = :total), VarianceController(domain; target = 0.5),
       StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5), ConstantPower(),
@@ -131,10 +132,10 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # default printed in full is the one this bound is for.
     many = Tracers(domain; number_of_particles = 20000, interpolation_scheme = LalescuSpline(4),
                    rng = MersenneTwister(1))
-    big = ObservablesCache(domain; number_of_particles = 20000, history_depth = 3)
+    big = ObservablesCache(domain; tracers = many, particle_integration_scheme = AB(3))
     @test length(repr(many)) ≤ 300
     @test length(repr(big)) ≤ 300
-    @test length(repr(allocate_buffers(AdamsBashforth(order = 3), many, big))) ≤ 300
+    @test length(repr(ParticleTrail(new_vector_point_values, many, 3))) ≤ 300
   end
 
   @testset "the compact form is self-delimiting" begin
@@ -199,26 +200,24 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
                                            domain)
     @test repr(velocity_only) != repr(ResolvedGenerator(domain, conditions; scalar = true))
 
-    # A cache without a particle slot, or with the wrong history depth, is refused by the particle
-    # schemes' `allocate_buffers`; the count and the depth are the two things it reads.
-    @test_throws ArgumentError allocate_buffers(Heun(), tracers, ObservablesCache(domain))
-    @test_throws ArgumentError allocate_buffers(AdamsBashforth(order = 3), tracers,
-                                                ObservablesCache(domain; number_of_particles = M))
-    @test repr(ObservablesCache(domain)) != repr(ObservablesCache(domain; number_of_particles = M))
-    @test repr(ObservablesCache(domain; number_of_particles = M)) !=
-          repr(ObservablesCache(domain; number_of_particles = M, history_depth = 3))
-    @test repr(ObservablesCache(domain; number_of_particles = M)) !=
-          repr(ObservablesCache(domain; number_of_particles = 2M))
+    # A cache is matched on its tracers' count and on the number of samples its trail keeps: the
+    # particle step refuses a cache built for another scheme, and the display tells the two apart.
+    cache(scheme; tracers = tracers) = ObservablesCache(domain; tracers, particle_integration_scheme = scheme)
+    twice = Tracers(domain; number_of_particles = 2M, interpolation_scheme = LalescuSpline(4),
+                    rng = MersenneTwister(1))
+    @test repr(ObservablesCache(domain)) != repr(cache(Heun()))
+    @test repr(cache(AB(2))) != repr(cache(AB(3)))
+    @test repr(cache(AB(3))) != repr(cache(AB(3); tracers = twice))
+    @test repr(AB(2)) != repr(AB(3)) && repr(AB(3)) != repr(ABM(3)) && repr(ABM(2)) != repr(Heun())
+    @test repr(Heun()) == "Heun()" && repr(ABM(1)) == "Heun()"
 
-    # Buffers built for one Adams–Bashforth order are refused by another's push.
-    cache2 = ObservablesCache(domain; number_of_particles = M, history_depth = 2)
-    cache3 = ObservablesCache(domain; number_of_particles = M, history_depth = 3)
-    buffers2 = allocate_buffers(AdamsBashforth(order = 2), tracers, cache2)
-    buffers3 = allocate_buffers(AdamsBashforth(order = 3), tracers, cache3)
-    @test_throws ArgumentError advect!(AdamsBashforth(order = 3), tracers, sim.cache.velocity_physical,
-                                       domain, buffers2, 0.01)
-    @test repr(buffers2) != repr(buffers3)
-    @test repr(AdamsBashforth(order = 2)) != repr(AdamsBashforth(order = 3))
+    # A trail is told apart by its values' kind, its capacity, and what it holds.
+    vectors = ParticleTrail(new_vector_point_values, tracers, 3)
+    @test repr(vectors) != repr(ParticleTrail(new_scalar_point_values, tracers, 3))
+    @test repr(vectors) != repr(ParticleTrail(new_vector_point_values, tracers, 4))
+    empty_form = repr(vectors)
+    push!(value -> nothing, vectors, 0.5)
+    @test repr(vectors) != empty_form && occursin("0.5", repr(vectors))
 
     # A tracer set without the unwrapped record is refused the unwrapped read.
     kept = Tracers(domain; number_of_particles = M, interpolation_scheme = LalescuSpline(4),
@@ -248,7 +247,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
   @testset "the parameter records round-trip" begin
     # A record's display is its constructor call: what it prints rebuilds it. This is also the
     # property every `NO_DISPLAY` exemption rests on, so the exempt records are here too.
-    for record in (HouLi(), HouLi(order = 24, strength = 30.0, materialized = true), AdamsBashforth(order = 3),
+    for record in (HouLi(), HouLi(order = 24, strength = 30.0, materialized = true), AB(3), ABM(3), Heun(),
                    SimulationRun.Clock(1.5, 3), SimulationRun.EveryTime(0.5, 1.0))
       rebuilt = eval(Meta.parse(repr(record)))
       @test typeof(rebuilt) === typeof(record)
@@ -263,16 +262,16 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # The domain's REPL form adds the resolved wavenumber; the cache's, each slot's standing.
     @test occursin("max_resolved_wavenumber", repl(domain))
     @test occursin("current", repl(sim.cache))
-    @test occursin("0 of 2 past samples filled", repl(sim.cache))
+    @test occursin("capacity 3, 1 sample", repl(sim.cache))
     Cache.advance_fields_epoch!(sim.cache)
     @test_throws ErrorException velocity_physical(sim.cache)   # the read refuses …
     @test occursin("stale", repl(sim.cache))                     # … and the display says so, without reading
     deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-    @test !occursin("stale", repl(sim.cache))
+    @test !occursin("stale", repl(sim.cache))                    # a field step does not date the trail
     Cache.advance_particles_epoch!(sim.cache)
     @test occursin("tracer positions have advanced", repl(sim.cache))
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
+    deposit!(sim.cache, sim.tracers, 1.0)
+    @test !occursin("stale", repl(sim.cache))
     @test occursin("never deposited", repl(ObservablesCache(domain)))
   end
 
@@ -284,7 +283,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # coefficients, cannot hide inside the string formatting a nested display legitimately spends.
     # The grid is larger than the rest of the file's so that the floor sits well above that noise,
     # and the tracer count is large enough that the particle arrays (``M \times 3`` reals, and the
-    # history's copies of them) are ABOVE the floor too — a display copying the positions of a
+    # trail's samples of them) are ABOVE the floor too — a display copying the positions of a
     # dozen tracers would allocate a few hundred bytes and slip under a field-scale floor.
     n, m = 32, 20000
     big = Simulation(FixedDomain(grid_points_per_axis = n, side_length = 2π, element_type = Float64,
@@ -292,12 +291,12 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
                      viscosity = 0.05,
                      scalar = PassiveScalar(forcing = VarianceRescaling(target = 0.5, over = :band)),
                      particles = ParticleTracking(number_of_particles = m,
-                                                  particle_integration_scheme = AdamsBashforth(order = 3)),
+                                                  particle_integration_scheme = AB(3)),
                      velocity_forcing = ConstantPower(injection_rate = 0.1))
     floor = n^3 * sizeof(Float64) ÷ 2
     @test m * 3 * sizeof(Float64) > floor   # the particle arrays are field-scale here, by construction
     for sample in (big.domain, big.state, big.cache, big.tracers, big.buffers, big.generator,
-                   big.generator.conditions, big.particle_buffers, big.particle_traversal, big)
+                   big.generator.conditions, velocity_at_particles_trail(big.cache), big.particle_traversal, big)
       show(IOBuffer(), sample)                       # warm up
       @test (@allocated show(IOBuffer(), sample)) < floor
       show(IOBuffer(), MIME"text/plain"(), sample)

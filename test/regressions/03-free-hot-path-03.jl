@@ -1,26 +1,24 @@
 # Witness: the periodic wrap must not launder a non-finite tracer position into the box origin.
 #
-# `_wrap!` (src/Particles.jl:216-220) is
-#     X .= mod.(X, L)
-#     X .= ifelse.(X .< L, X, zero(eltype(X)))
-# The second pass exists to fold the floating-point endpoint `mod(-1e-20, 2π) === 2π` back to 0
-# (the comment at Particles.jl:211-215). But every comparison against NaN is false, so a NaN
-# position — and an Inf, since `mod(Inf, L) === NaN` — also takes the `ifelse` FALSE branch and is
-# written out as exactly `zero(eltype(X))`. Every `advect!` ends in `_wrap!`, so a blown-up
-# velocity field lands the whole tracer set on the origin with `all(isfinite, positions) == true`.
+# The defect: the wrap was `X .= mod.(X, L)` followed by `X .= ifelse.(X .< L, X, zero(eltype(X)))`,
+# the second pass folding the floating-point endpoint `mod(-1e-20, 2π) === 2π` back to 0. But every
+# comparison against NaN is false, so a NaN position — and an Inf, since `mod(Inf, L) === NaN` —
+# also took the `ifelse` FALSE branch and was written out as exactly `zero(eltype(X))`. Every
+# `advect!` ends in the wrap, so a blown-up velocity field landed the whole tracer set on the origin
+# with `all(isfinite, positions) == true`.
 #
 # Correct behaviour, either way round: a trajectory advanced by a non-finite velocity must NOT
 # report finite positions — it either carries the non-finiteness through (so a downstream
 # `all(isfinite, …)` health check can see it) or is rejected with an error. What must not happen is
-# the current outcome: silent, finite-looking zeros.
+# silent, finite-looking zeros.
 
 using Test, Random
 using GBGPeriodicFields: point_positions, npoints
 using GBGHomogeneousTurbulence
-using GBGHomogeneousTurbulence.Particles: Heun, advect!
-using GBGHomogeneousTurbulence.Propagator: allocate_buffers
 using GBGPeriodicFields: field_data, PointSet
 using GBGPeriodicFields.Interpolation: CatmullRom
+
+include(joinpath(@__DIR__, "..", "prescribed_flow.jl"))
 
 const N = 16
 
@@ -28,15 +26,11 @@ const N = 16
 function poisoned_step(poison)
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π,
                        element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
-  u = new_vector_field_physical(domain)
-  field_data(u) .= poison
   tracers = Tracers(domain; positions = PointSet([1.0 2.0 3.0; 0.5 0.5 0.5]),
                     interpolation_scheme = CatmullRom)
-  cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
-  buffers = allocate_buffers(Heun(), tracers, cache)
-  deposit!(cache, tracers, u)
+  cache = ObservablesCache(domain; tracers, particle_integration_scheme = Heun())
   try
-    advect!(Heun(), tracers, u, domain, buffers, 0.01)
+    advect_in_prescribed_flow!((u, t) -> (field_data(u) .= poison; u), Heun(), tracers, domain, cache, (0.01,))
   catch err
     return (:rejected, err)
   end
@@ -60,9 +54,8 @@ end
     sim = Simulation(grid_points_per_axis = N, particles = ParticleTracking(number_of_particles = 4),
                      rng = MersenneTwister(1234))
     field_data(sim.state.velocity_spectral) .= NaN
-    # Refresh the cache from the poisoned state.
+    # Refresh the cache's fields from the poisoned state.
     deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
     local X
     rejected = false
     try

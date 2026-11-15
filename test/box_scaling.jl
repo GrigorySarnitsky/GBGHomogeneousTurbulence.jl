@@ -74,7 +74,7 @@ end
   positions = rand(MersenneTwister(9), 20, 3) .* 2π
   tracking(domain, X) = ParticleTracking(Tracers(domain; interpolation_scheme = CatmullRom,
                                                  positions = PointSet(X), unwrapped = true),
-                                         particle_integration_scheme = AdamsBashforth(order = 3))
+                                         particle_integration_scheme = AB(3))
   reference = Simulation(box(2π); viscosity = 0.02,
                          velocity_forcing = StochasticOU(forcing_variance = 0.5, correlation_time = 0.7, seed = 5),
                          particles = tracking(box(2π), copy(positions)), rng = MersenneTwister(1))

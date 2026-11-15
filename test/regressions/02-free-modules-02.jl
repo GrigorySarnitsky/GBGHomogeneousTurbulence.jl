@@ -14,6 +14,8 @@ using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_valu
                          PointSet, wrap!, point_positions
 using Test
 
+include(joinpath(@__DIR__, "..", "prescribed_flow.jl"))
+
 @testset "a non-finite tracer coordinate is never turned into a healthy 0.0" begin
   L = 2π
   T = Float64
@@ -46,20 +48,19 @@ using Test
   end
 
   @testset "advect! does not launder a blown-up velocity into finite positions" begin
-    u = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
-
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
-    buffers = allocate_buffers(Heun(), tracers, cache)
+    cache = ObservablesCache(domain; tracers, particle_integration_scheme = Heun())
+    blown_up!(u) = (field_data(u) .= NaN; u)   # the ordinary blow-up mode of an over-stepped run
 
-    field_data(u) .= NaN                       # the ordinary blow-up mode of an over-stepped run
-    deposit!(cache, tracers, u)     # v1 <- u(t_n, X(t_n)), now non-finite
-    @test !all(isfinite, point_values(cache.velocity_at_particles))
+    deposit_prescribed_velocity!(blown_up!, cache; step = false)
+    deposit!(cache, tracers, 0.0)              # the sample u(t_n, X(t_n)), now non-finite
+    @test !all(isfinite, point_values(velocity_at_particles_trail(cache)[0].value))
 
     threw = false
     try
-      advect!(Heun(), tracers, u, domain, buffers, 0.01)
+      deposit_prescribed_velocity!(blown_up!, cache)
+      advect!(Heun(), tracers, domain, cache, 0.01)
     catch
       threw = true
     end

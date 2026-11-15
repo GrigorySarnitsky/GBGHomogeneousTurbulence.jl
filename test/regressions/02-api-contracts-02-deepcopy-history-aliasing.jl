@@ -1,11 +1,11 @@
-# Witness: the claim that `past = [deepcopy(velocity_at_particles) for _ in 1:…]` (src/Cache.jl:166)
-# may alias rather than independently duplicate its storage — on a device backend in particular —
-# so that the multistep history shift `copyto!(point_values(past[j]), point_values(past[j-1]))`
-# (src/Particles.jl:483) would corrupt a slot some other slot secretly shares.
+# Witness: the claim that the slots holding the earlier samples of the velocity at the particles may
+# alias rather than independently own their storage — on a device backend in particular — so that
+# writing one sample would corrupt another that secretly shares its array. The claim was raised
+# against a history built with `deepcopy`; the trail that replaced it allocates each slot by its own
+# call of the allocator.
 #
-# This file asserts the CORRECT behaviour: every slot of the Lagrangian sample history — and the
-# current slot the cache serves — owns storage independent of every other, so a history shift is
-# observable only in the slot it writes.
+# This file asserts the CORRECT behaviour: every slot of the trail owns storage independent of every
+# other, so a new sample is observable only in the slot it is written to.
 #
 # Base's contract (docs.julialang.org/en/v1/base/base/#Base.deepcopy): "Create a deep copy of `x`:
 # everything is copied recursively, resulting in a fully independent object." The device backends
@@ -14,57 +14,55 @@
 # AMDGPU's `ROCArray`); the GPU half of this witness lives beside it and needs a CUDA environment.
 
 using Test, Random
-using GBGPeriodicFields: npoints
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: VectorPointValues, point_values, CatmullRom
 
-@testset "the Lagrangian sample history owns independent storage per slot" begin
+@testset "the trail of the velocity at the particles owns independent storage per slot" begin
   T = Float64
   N = 8
   M = 5
-  K = 4                                        # AdamsBashforth{4} ⇒ K-1 = 3 past slots
 
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = T,
                        dealiasing = TwoThirds(), array_family = Array)
   tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = CatmullRom,
                     rng = MersenneTwister(1))
-  cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),
-                           history_depth = K)
-  past = cache.velocity_at_particles_history
-  @test length(past) == K - 1
+  for trail in (ObservablesCache(domain; tracers, particle_integration_scheme = AB(4)).velocity_at_particles_trail,
+                ParticleTrail(new_vector_point_values, tracers, 4))
+    slots = trail.values
+    @test length(slots) == 4
 
-  # every slot is a distinct object over a distinct array, including against the current slot
-  slots = Any[cache.velocity_at_particles, past...]
-  arrays = map(point_values, slots)
-  for i in eachindex(arrays), j in eachindex(arrays)
-    i == j && continue
-    @test arrays[i] !== arrays[j]
-  end
-
-  # the mutation test: writing one slot leaves every other bit-unchanged
-  for i in eachindex(arrays)
-    for (j, a) in enumerate(arrays)
-      a .= T(j)
+    # every slot is a distinct object over a distinct array
+    arrays = map(point_values, slots)
+    for i in eachindex(arrays), j in eachindex(arrays)
+      i == j && continue
+      @test slots[i] !== slots[j]
+      @test arrays[i] !== arrays[j]
     end
-    arrays[i] .= T(-99)
-    for j in eachindex(arrays)
-      j == i && continue
-      @test all(arrays[j] .== T(j))
+
+    # the mutation test: writing one slot leaves every other bit-unchanged
+    for i in eachindex(arrays)
+      for (j, a) in enumerate(arrays)
+        a .= T(j)
+      end
+      arrays[i] .= T(-99)
+      for j in eachindex(arrays)
+        j == i && continue
+        @test all(arrays[j] .== T(j))
+      end
     end
   end
 
-  # the shift of Particles.jl:483, in place: past[j] ← past[j-1] must not leak into past[j-1]
-  for (j, a) in enumerate(arrays)
-    a .= T(j)
-  end
-  for j in (K - 1):-1:2
-    copyto!(point_values(past[j]), point_values(past[j-1]))
-  end
-  copyto!(point_values(past[1]), point_values(cache.velocity_at_particles))
-  # slots 1 (current) and past[1] now hold 1.0; past[j] holds the old past[j-1] = j
-  @test all(point_values(past[1]) .== T(1))
-  for j in 2:(K - 1)
-    @test all(point_values(past[j]) .== T(j))   # the pre-shift value of past[j-1] = arrays[j]
+  # Through the public write: six samples into a trail of four. Each sample read back holds its own
+  # values, and a new sample changes none of the three it leaves in place.
+  trail = ParticleTrail(new_vector_point_values, tracers, 4)
+  for n in 1:6
+    kept = [(sample.time, copy(point_values(sample.value))) for sample in trail][max(end - 2, 1):end]
+    push!(value -> (point_values(value) .= T(n)), trail, T(n))
+    @test all(point_values(trail[0].value) .== T(n))
+    for (offset, (time, values)) in zip((-length(kept)):-1, kept)
+      @test trail[offset].time == time
+      @test point_values(trail[offset].value) == values
+    end
   end
 end
 

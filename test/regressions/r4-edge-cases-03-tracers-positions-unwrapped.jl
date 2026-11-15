@@ -11,6 +11,8 @@ using GBGPeriodicFields: npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet
 using Test
 
+include(joinpath(@__DIR__, "..", "prescribed_flow.jl"))
+
 @testset "hand-built tracer positions are read periodically (x = L is the same point as x = 0)" begin
   T = Float64
   N = 16
@@ -32,9 +34,10 @@ using Test
 
   sample(X) = begin
     tracers = Tracers(domain; positions = PointSet(copy(X)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
-    deposit!(cache, tracers, u)
-    copy(point_values(cache.velocity_at_particles))
+    cache = ObservablesCache(domain; tracers, particle_integration_scheme = Heun())
+    deposit_prescribed_velocity!(slot -> (field_data(slot) .= d; slot), cache; step = false)
+    deposit!(cache, tracers, 0.0)
+    copy(point_values(velocity_at_particles_trail(cache)[0].value))
   end
 
   # (a) the excluded upper endpoint against its image at 0 — the case `_wrap!`'s own comment names

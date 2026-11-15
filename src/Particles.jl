@@ -1,60 +1,47 @@
-# Particles — Lagrangian tracer tracking. Tracers are advected by the velocity through the package's
+# Particles — the Lagrangian particles a run carries, as state and as a place to measure. Tracers are
+# positions in the periodic box; any physical field can be sampled at them through the package's
 # grid→point interpolation (a selectable `GBGPeriodicFields` spline scheme; `CatmullRom` by default,
-# `LalescuSpline`/`LagrangeSpline` for higher order), and any physical field can be sampled along the
-# trajectories; accumulating statistics over them is the caller's analysis, not this package's.
+# `LalescuSpline`/`LagrangeSpline` for higher order), and a `ParticleTrail` keeps the last few
+# samples of one quantity with their times, so that its time derivative along the trajectories can
+# be taken. Accumulating statistics over the samples is the caller's analysis, not this package's.
 #
-# Trajectory time integration is pluggable, exactly as the field side is: the scheme is an
-# `AbstractParticleIntegrator` and its per-step registers are allocated per scheme by
-# `allocate_buffers`, so the tracer set holds only trajectory STATE and never one scheme's scratch.
-# `Heun` is the one scheme today — second-order, on the velocity at the start and end of the
-# step (tₙ and tₙ₊₁), unlike advecting on the frozen start-of-step velocity (effectively first
-# order). Its two velocity fields are exactly what the field solver already produces each step, so
-# the tracer advance stays decoupled from the field Runge–Kutta internals. A higher-order scheme would
-# want different registers (RK4 several stage velocities; a multistep scheme only host weight
-# scratch, its sample history living in the cache) — which is precisely why they are not in `Tracers`.
+# What advances the positions in time is not here: the schemes and the step live in
+# `ParticlePropagator`, which loads after the observables cache it reads. This module loads before
+# the cache, because the cache holds a trail of the velocity at the particles.
 
 """
     Particles
 
-It tracks Lagrangian particles, today the massless tracer:
+It holds Lagrangian particles, today the massless tracer, and what is measured at them:
 
 - [`Tracers`](@ref) — the tracer set: the positions (a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)), a selectable
-  interpolation scheme, and opt-in unwrapped positions read by [`unwrapped_positions`](@ref). The
-  velocity at the particles is read from the run's observables cache through
-  [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles).
-- [`AbstractParticleIntegrator`](@ref) — the particle integration schemes,
-  [`Heun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) the
-  per-step storage a scheme needs, and [`history_depth`](@ref) the length of the
-  velocity-at-particles history a scheme requires.
-- [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) — this module adds the particle
-  method: interpolate the flow velocity at the tracers' current positions and deposit it in the
-  observables cache. One value has two consumers: the Lagrangian statistics a caller accumulates,
-  and the next advance, which reads it as its start-of-step velocity.
-- [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
+  interpolation scheme, and opt-in unwrapped positions read by [`unwrapped_positions`](@ref).
 - [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate the output buffers it fills.
+- [`ParticleTrail`](@ref) — the last few samples of one quantity at the particles, each with its
+  time; [`time_derivative!`](@ref) and [`time_derivative`](@ref) differentiate it in time along
+  the trajectories. The run keeps one for the velocity, read through
+  [`velocity_at_particles_trail`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles_trail).
 - [`ParticleTraversal`](@ref) — the memory-locality order the gathers visit the tracers in, a
   value-preserving accelerator; [`rebuild_traversal!`](@ref) refreshes it from the current
   positions.
-- [`write_tracers`](@ref) / [`read_tracers`](@ref) — the tracer set's HDF5 persistence: positions,
-  the opt-in unwrapped positions, and the interpolation scheme as one self-describing group
-  (available once `HDF5` is loaded).
+- [`write_tracers`](@ref) / [`read_tracers`](@ref) and [`write_trail`](@ref) /
+  [`read_trail`](@ref) — the HDF5 persistence of a tracer set and of a trail, each as one
+  self-describing group (available once `HDF5` is loaded).
+
+The schemes that advance the positions are in
+[`ParticlePropagator`](@ref GBGHomogeneousTurbulence.ParticlePropagator).
 """
 module Particles
 
 using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, _real_type
-using ..Cache: ObservablesCache, deposit_velocity_at_particles!, advance_particles_epoch!
-# One generic builds the per-scheme registers on both sides of the run — the field scheme's and
-# the particle integration scheme's — because it is one concept: allocate exactly what this scheme needs.
-import ..Propagator: allocate_buffers, deposit!
 
-export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
-       ParticleIntegratorBuffers, ParticleTraversal, rebuild_traversal!,
-       advect!, history_depth, interpolate_at_particles!,
-       unwrapped_positions, new_vector_point_values, new_scalar_point_values
+export Tracers, ParticleTraversal, rebuild_traversal!, interpolate_at_particles!,
+       unwrapped_positions, new_vector_point_values, new_scalar_point_values,
+       ParticleTrail, time_derivative!, time_derivative
 
 
 """
@@ -108,24 +95,20 @@ advance!(sim)
 # the (M, 3) positions, via GBGPeriodicFields
 X = point_positions(sim.tracers.positions)
 # u(tₙ, X(tₙ)), the Lagrangian velocity — throws if stale
-v = velocity_at_particles(sim.cache)
+v = velocity_at_particles_trail(sim.cache)[0].value
 
 out = new_scalar_point_values(sim.tracers)  # allocate once, then reuse every iteration
 interpolate_at_particles!(out, scalar_physical(sim.cache), sim.tracers)
 ```
 
-Building a set directly — to place tracers deliberately rather than at random, and to advance them
-by hand — takes the `positions` form, and then the scheme's per-step storage is yours to allocate:
+Building a set directly, to place tracers deliberately rather than at random, takes the
+`positions` form, and a run adopts the set through
+[`ParticleTracking`](@ref GBGHomogeneousTurbulence.SimulationRun.ParticleTracking):
 
 ```julia
 tracers = Tracers(domain; positions = PointSet([0.1 0.2 0.3; 1.0 1.0 1.0]),
                   interpolation_scheme = CatmullRom)
-cache   = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
-buffers = allocate_buffers(Heun(), tracers, cache)
-
-# u(tₙ) at the current positions — do this first
-deposit!(cache, tracers, u)
-advect!(Heun(), tracers, u_end, domain, buffers, dt)
+sim = Simulation(domain; particles = ParticleTracking(tracers))
 ```
 
 Read the particle state straight off the struct's own fields — the positions are
@@ -137,10 +120,7 @@ this package. Passing `unwrapped = true` additionally tracks the winding-preserv
 unwrapped positions `unwrapped_positions` serves — the wrapped positions stay the dynamical
 state either way. The velocities are a *deposited observable*, not tracer state: the particle form
 of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) writes them into the run's observables cache at the end of each iteration, and
-[`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) reads them there.
-
-The particle integration scheme's own working storage is not here: it lives in a
-[`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
+[`velocity_at_particles_trail`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles_trail) reads them there.
 
 # Fields
 - `positions` — the tracer positions, as the
@@ -211,10 +191,8 @@ so a run with and without it produces bitwise-identical trajectories and samples
 A run builds one for you: the `traversal_mode` of its
 [`ParticleTracking`](@ref GBGHomogeneousTurbulence.SimulationRun.ParticleTracking) decides whether,
 and whether the run or the caller rebuilds it.
-Building it by hand belongs with a hand-run loop, where the `ParticleTraversal` itself is passed on to
-[`advect!`](@ref), the particle form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)
-and [`interpolate_at_particles!`](@ref) through their `traversal` keyword; on a run, that is
-`sim.particle_traversal`.
+A caller's own gather takes it through the `traversal` keyword of
+[`interpolate_at_particles!`](@ref); on a run, that is `sim.particle_traversal`.
 
 # Arguments
 
@@ -229,7 +207,7 @@ and [`interpolate_at_particles!`](@ref) through their `traversal` keyword; on a 
 !!! note "One order serves every gather of the step"
     `GBGPeriodicFields` accepts any same-length order for a point set of the same count, so the one
     order built from the tracer positions is also passed to the gather at the predicted positions
-    a [`Heun`](@ref) step makes; those sit a step's displacement from the tracers, well inside the
+    a [`Heun`](@ref GBGHomogeneousTurbulence.ParticlePropagator.Heun) step makes; those sit a step's displacement from the tracers, well inside the
     tiles the order groups.
 
 # Fields
@@ -290,419 +268,6 @@ _order(traversal::ParticleTraversal) = traversal.order
 function rebuild_traversal!(traversal::ParticleTraversal, domain::FixedDomain, tracers::Tracers)
   point_traversal_order!(traversal.order, domain.grid, tracers.positions, traversal.scratch)
   return traversal
-end
-
-
-"""
-    AbstractParticleIntegrator
-
-The supertype of the particle integration schemes — how the tracer positions are advanced
-over one step, the Lagrangian counterpart of the field side's
-[`AbstractIntegrator`](@ref GBGHomogeneousTurbulence.Propagator.AbstractIntegrator). A scheme is a
-value (`Heun()`), passed to [`advect!`](@ref) and to
-[`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers), which builds exactly
-the working storage that scheme needs.
-
-The family has two members today: [`Heun`](@ref), a one-step method that buys second order with a second
-interpolation, and [`AdamsBashforth`](@ref), a multistep method that buys more by reusing the
-Lagrangian samples the run already deposits. Which trade a run wants is for its user to measure — one
-interpolation per step against one stored array per extra order.
-"""
-abstract type AbstractParticleIntegrator end
-
-
-"""
-    Heun()
-
-Second-order Heun-in-time on the velocity at the two ends of the step — the particle
-integration scheme a run uses by default. It advances the positions with the start-of-step Lagrangian
-velocity the previous iteration's closing particle
-[`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) left in the cache and the
-end-of-step velocity field the solver has just produced, so it needs nothing from inside the field
-scheme's stages.
-
-It needs one set of predicted positions and the velocity interpolated there
-([`ParticleIntegratorBuffers`](@ref)). One step of [`advect!`](@ref) over ``\\Delta t`` is
-
-```math
-\\begin{aligned}
-\\boldsymbol{v}_1 &= \\boldsymbol{u}(t_n, \\boldsymbol{X}), &
-\\boldsymbol{X}^{*} &= \\boldsymbol{X} + \\Delta t \\boldsymbol{v}_1, \\\\
-\\boldsymbol{v}_2 &= \\boldsymbol{u}(t_{n+1}, \\boldsymbol{X}^{*}), &
-\\boldsymbol{X} &\\leftarrow \\boldsymbol{X} + \\tfrac{\\Delta t}{2}(\\boldsymbol{v}_1 + \\boldsymbol{v}_2),
-\\end{aligned}
-```
-
-with positions wrapped into ``[0, L)``, ``L`` the box side.
-
-!!! note "Pair it with the default interpolant unless the grid is coarse"
-    Under the advective-CFL loop ``\\Delta t \\propto \\Delta x``, so this scheme's error falls as
-    ``\\Delta x^{2}`` while a degree-``d`` interpolant's trajectory floor falls as
-    ``\\Delta x^{d+1}``. For the default
-    [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) (degree 2)
-    the floor therefore falls *faster* than the time error, and the two cross over: measured on a
-    band-limited field of ``N`` grid points per axis, interpolation dominates at ``N = 16{-}32``
-    and the time error dominates from ``N \\approx 64`` on (at ``N = 128`` the floor is
-    ``1\\times10^{-5}`` against a time error of ``6\\times10^{-5}``; the numbers are setup-specific,
-    and only the ``\\Delta x^{d+1}`` trend generalizes). So at production resolutions `CatmullRom` is
-    not what limits a Heun
-    trajectory and a wider stencil buys nothing; at coarse resolution, or with ``\\Delta t`` cut well
-    below the CFL value, `LalescuSpline(8; smoothness = 1)` — same ``C^1``, degree 3 — moves the floor down by
-    more than an order of magnitude. What governs this in a run is how well the grid resolves the
-    Kolmogorov length ``\\eta``, so read ``N`` here as a stand-in for ``\\kappa_{\\max}\\eta``, with
-    ``\\kappa_{\\max}`` the largest resolved wavenumber.
-"""
-struct Heun <: AbstractParticleIntegrator end
-
-
-"""
-    ParticleIntegratorBuffers
-
-The per-step storage a particle integration scheme computes in, sized to a tracer set and allocated
-once, so advancing the tracers allocates nothing. Build it with
-[`allocate_buffers(scheme, tracers, cache)`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers),
-which allocates exactly what `scheme` needs and nothing more; a run builds it for you.
-
-This storage belongs to the scheme, not to the trajectory — which is why it lives here rather than
-in [`Tracers`](@ref). One type serves every scheme, because the storage sets nest: a multistep
-scheme uses the predictor arrays for its [`Heun`](@ref) starting steps only, and adds two
-`order`-element host vectors for its weight solve.
-
-The past Lagrangian samples a multistep scheme integrates over are not held here. They are
-deposited observables — measurements of the velocity along the trajectory — so they live in the
-[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) beside the current sample
-they extend.
-
-# Fields
-- `predictor` — the `(M, 3)` predicted positions of the ``M`` tracers, which no tracer ever occupies.
-- `predictor_points` — a
-  [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `predictor`.
-- `velocity_predictor` — the velocity interpolated at the predicted positions. It is reachable like
-  any field of this type, but it is a scheme intermediate rather than a sample of the flow at any
-  instant, so nothing in the package offers it as one: read
-  [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) for the Lagrangian
-  sample.
-- `cache` — the run's `ObservablesCache`: the start-of-step sample and any multistep history are
-  its slots.
-- `weights`, `nodes` — the `order`-element host scratch of a multistep weight solve; empty for a
-  one-step scheme.
-"""
-struct ParticleIntegratorBuffers{P, PS, VV, C}
-  predictor::P
-  predictor_points::PS
-  velocity_predictor::VV
-  cache::C                  # the run's ObservablesCache: the v₁ sample is ITS slot (decision 67)
-  # Host scratch for the multistep weight solve, allocated once (the solve runs every warmed-up
-  # step, and the hot loop is allocation-free over preallocated buffers). Empty for a one-step scheme.
-  weights::Vector{Float64}
-  nodes::Vector{Float64}
-end
-
-
-function _allocate_particle_buffers(tracers::Tracers, cache::ObservablesCache, order::Int)
-  cache.velocity_at_particles === nothing &&
-    throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
-                        "`number_of_particles` matching the tracer set — the sample the push " *
-                        "consumes is the cache's observable, not tracer state"))
-  predictor = similar(point_positions(tracers.positions))
-  return ParticleIntegratorBuffers(predictor, PointSet(predictor),
-                                   VectorPointValues(similar(predictor)), cache,
-                                   zeros(Float64, order), zeros(Float64, order))
-end
-
-
-allocate_buffers(::Heun, tracers::Tracers, cache::ObservablesCache) =
-  _allocate_particle_buffers(tracers, cache, 0)
-
-
-"""
-    AdamsBashforth(; order = 4)
-
-Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at
-its default order (Lalescu et al. 2022) — buying accuracy in
-time at no extra field evaluation and no extra interpolation per step.
-
-Use it in place of [`Heun`](@ref) when trajectory accuracy in time limits a measurement. Heun
-buys its second order by interpolating a second time, at predicted positions; Adams–Bashforth instead
-reuses the Lagrangian samples the run has already deposited at earlier instants. The trade is one
-stored array per extra order against one interpolation per step. One step of [`advect!`](@ref) is
-
-```math
-\\boldsymbol{X} \\leftarrow \\boldsymbol{X}
-  + \\sum_{j=0}^{K-1} b_j \\boldsymbol{u}(t_{n-j}, \\boldsymbol{X}(t_{n-j})),
-```
-
-with ``K`` the order and the weights ``b_j`` re-solved each step by integrating the Lagrange basis
-on the recorded step history.
-
-The steps are not assumed uniform: the advective-CFL loop changes ``\\Delta t`` every iteration,
-which classical fixed-step coefficients would silently get wrong, so the weights are recomputed each
-step from the actual step history. That is ``\\mathcal{O}(\\texttt{order}^2)`` host arithmetic per
-step, independent of the tracer count.
-
-A multistep method has no history at ``t_0``, so the first `order - 1` steps are taken with
-`Heun` and the scheme then switches over. Those second-order starting steps leave a fixed error behind, so over a fixed window
-`order = 4` converges at about third order rather than fourth — on a smooth test problem, ``3.0``
-against ``2.0`` for the two-step method, with an error some fifty times smaller at equal step count.
-A higher-order start would need the velocity between the step endpoints, which the solver does not
-produce.
-
-# Arguments
-- `order = 4` — how many past samples are used. `1` is forward Euler, `2` the two-step method, `4`
-  TurTLE's default. Orders above `8` are refused with an `ArgumentError`: past it the four-point
-  Gauss–Legendre rule that integrates the interpolation weights stops being exact, and the refusal
-  is loud because the alternative is silently wrong weights. The cap is far above any useful order,
-  since an Adams–Bashforth stability region shrinks with each step added — and the bootstrap makes
-  high orders *worse*, not just useless: over a fixed window, `order = 6` and `order = 8` measure
-  the same third-order convergence as `order = 4` with larger errors (measured ``1.0`` and
-  ``1.4`` against ``0.6``, in units of ``10^{-7}`` at 80 steps: the longer `Heun` bootstrap
-  costs more than the extra history returns). The practical ceiling is `order = 4`.
-
-!!! warning "The interpolant sets a floor no timestep can cross"
-    Interpolating the velocity perturbs the field the tracers follow, and that perturbation does not
-    shrink with ``\\Delta t``: for a perturbation of size ``\\delta`` and a flow with Lipschitz
-    constant ``\\Lambda`` over a span ``t``, Grönwall bounds the trajectory error by
-    ``\\delta(\\mathrm{e}^{\\Lambda t} - 1)/\\Lambda`` however the time integration is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
-    Where `Heun`'s docstring reports a crossover in resolution, this scheme has none:
-    at third order under the advective-CFL loop the time error falls as ``\\Delta x^{3}`` — the
-    same rate as the default `CatmullRom` floor's ``\\Delta x^{d+1}`` — so their ratio is set by
-    prefactors alone, and measured on a band-limited field at ``N = 32``–``128`` the floor stays
-    two to three orders of magnitude *below* the time error. At CFL steps the interpolant never
-    limits an Adams–Bashforth trajectory, and a wider stencil buys nothing; only a ``\\Delta t``
-    cut well below the CFL value surfaces the floor.
-
-    The floor is set by the interpolant's polynomial reproduction degree, not its smoothness
-    class — measured here, raising the degree at fixed ``C^1`` lowered it fifty-fold, while varying
-    the smoothness at fixed degree left the time convergence unchanged. Raise the degree when the
-    floor is what limits you; smoothness buys something different, namely readouts that
-    *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010).
-
-# References
-- Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys. Commun.* 278, 108406.
-- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* 229(17), 5862–5869.
-
-# Fields
-The scheme stores no fields: `order` is carried as a type parameter, so the keyword constructor
-above is the only way to build one.
-"""
-struct AdamsBashforth{K} <: AbstractParticleIntegrator end
-
-# The upper bound is the quadrature's, not a taste: `_adams_bashforth_weights` integrates the
-# degree-(order−1) Lagrange basis with a FOUR-point Gauss–Legendre rule, exact only through degree 7.
-# At order ≥ 9 the rule would return silently inexact weights — a wrong trajectory with no symptom —
-# so the ceiling is enforced here rather than documented and hoped for.
-AdamsBashforth(; order::Integer = 4) =
-  (order >= 1 || throw(ArgumentError("`order` must be at least 1, got $order"));
-   order <= 8 || throw(ArgumentError("`order` must be at most 8, got $order: the four-point " *
-                                     "Gauss–Legendre rule that integrates the weights is exact " *
-                                     "only through degree 7, so a higher order would be given " *
-                                     "silently wrong coefficients"));
-   AdamsBashforth{Int(order)}())
-
-
-function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers, cache::ObservablesCache) where {K}
-  # Equality, not sufficiency — the same demand every advect! makes. A shallower cache would read
-  # fewer past samples than the order claims (a silently lower-order integration); a deeper one
-  # passes allocation only to be refused by the first push, since the shared history's fill level
-  # is capped against the order of the advancing call.
-  length(cache.velocity_at_particles_history) == K - 1 ||
-    throw(ArgumentError("this cache carries $(length(cache.velocity_at_particles_history)) past " *
-                        "sample(s), but `AdamsBashforth(order = $K)` integrates over exactly " *
-                        "$(K - 1); build the cache with `history_depth = $K`"))
-  return _allocate_particle_buffers(tracers, cache, K)
-end
-
-
-"""
-    history_depth(scheme) -> Int
-
-How many Lagrangian samples `scheme` must be able to look back over, counting the current one.
-
-A run reads this to size the sample history its
-[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) carries. A one-step scheme
-answers `1` and needs no history stored; an `order`-step method answers `order`.
-"""
-function history_depth end
-
-history_depth(::AbstractParticleIntegrator) = 1
-history_depth(::AdamsBashforth{K}) where {K} = K
-
-
-# Variable-step Adams–Bashforth weights. With samples f_j at times t_n = τ_0 > τ_1 > … > τ_{k-1},
-# the update is X_{n+1} = X_n + Σ_j b_j f_j, where b_j = ∫_{t_n}^{t_n+h} L_j(t) dt and L_j is the
-# Lagrange basis on those nodes. Four-point Gauss–Legendre integrates the degree-(k-1) basis exactly
-# for every order this scheme allows, and the whole computation is k² host arithmetic per step.
-const _GAUSS_NODES = (-0.8611363115940526, -0.3399810435848563, 0.3399810435848563, 0.8611363115940526)
-const _GAUSS_WEIGHTS = (0.3478548451374538, 0.6521451548625461, 0.6521451548625461, 0.3478548451374538)
-
-function _adams_bashforth_weights(b::Vector{Float64}, τ::Vector{Float64}, h::Float64,
-                                  steps::AbstractVector{Float64}, k::Int)
-  τ[1] = 0.0                                 # node times, relative to t_n, going backwards
-  for j in 2:k
-    τ[j] = τ[j-1] - steps[j-1]
-  end
-  fill!(b, 0.0)
-  for (ξ, w) in zip(_GAUSS_NODES, _GAUSS_WEIGHTS)
-    t = h * (ξ + 1) / 2                      # map [-1,1] → [0,h]
-    scale = w * h / 2
-    for j in 1:k                             # Lagrange basis at t, on nodes τ
-      Lj = 1.0
-      for m in 1:k
-        m == j && continue
-        Lj *= (t - τ[m]) / (τ[j] - τ[m])
-      end
-      b[j] += scale * Lj
-    end
-  end
-  return b
-end
-
-
-function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, domain::FixedDomain,
-                 buffers::ParticleIntegratorBuffers, dt::Real; traversal = nothing) where {K}
-  T = real(eltype(point_positions(tracers.positions)))
-
-  # A non-positive step would enter the history as a repeated (or reversed) node, and the Lagrange
-  # basis divides by the node differences — so the next warmed-up step divides by zero and returns
-  # NaN positions. Refused here, where the history is written, rather than left to surface as a
-  # silently ruined trajectory some steps later.
-  dt > 0 || throw(ArgumentError("`dt` must be positive, got $dt: a multistep history cannot carry " *
-                                "a zero-length or reversed step"))
-
-  cache = buffers.cache
-  past, steps = cache.velocity_at_particles_history, cache.history_steps
-  # The history's depth IS the order this call will actually achieve. Handed buffers built for a
-  # shallower scheme, the loop below would read fewer past samples than `K` claims and integrate at
-  # a lower order without saying so.
-  length(past) == K - 1 ||
-    throw(ArgumentError("this `AdamsBashforth(order = $K)` integrates over $(K - 1) past sample(s), " *
-                        "but the buffers it was handed carry $(length(past)): they were built for a " *
-                        "different order. Equality, not sufficiency — the shared history's fill " *
-                        "level is capped against the order of whichever call last advanced it, so " *
-                        "mixing two orders over one history corrupts the bookkeeping in both."))
-  # The weight scratch is sized at allocation; a mismatch means the buffers were built for another
-  # scheme, and the solve below would read past their end. `allocate_buffers` ties the weights and
-  # the history depth to one order, so through it the guard above always fires first; this one
-  # stands for a hand-assembled `ParticleIntegratorBuffers`.
-  length(buffers.weights) == K ||
-    throw(ArgumentError("these buffers carry weight scratch for order $(length(buffers.weights)), " *
-                        "not $K: they were built for a different scheme; allocate with " *
-                        "`allocate_buffers(AdamsBashforth(order = $K), tracers, cache)`"))
-
-  if cache.history_filled < K - 1            # no history yet: start up on the one-step scheme
-    advect!(Heun(), tracers, velocity_end, domain, buffers, dt; traversal)
-  else
-    b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), steps, K)
-    # ONE fused K-term displacement, wrap included (PF decision 73): the K broadcast passes this
-    # loop once made over the positions collapse into a single traversal. The unwrapped record,
-    # when tracked, takes the identical terms through the grid-free form.
-    terms = ((T(b[1]), cache.velocity_at_particles),
-             ntuple(j -> (T(b[j + 1]), past[j]), K - 1)...)
-    displace!(tracers.positions, domain.grid, terms...)
-    tracers.unwrapped_positions === nothing ||
-      displace!(tracers.unwrapped_positions, terms...)
-    advance_particles_epoch!(cache)          # the bootstrap branch advanced it through Heun's push
-  end
-
-  # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
-  # what keeps the deposited observable intact — the current slot is rewritten every iteration, so a
-  # multistep method that aliased it would integrate over values that have since been overwritten.
-  for j in min(cache.history_filled + 1, K - 1):-1:2
-    copyto!(point_values(past[j]), point_values(past[j-1]))
-    steps[j] = steps[j-1]
-  end
-  if K > 1
-    copyto!(point_values(past[1]), point_values(cache.velocity_at_particles))
-    steps[1] = Float64(dt)
-    cache.history_filled = min(cache.history_filled + 1, K - 1)
-  end
-  return tracers
-end
-
-
-# The particle method of `deposit!` — the generic, and the one docstring covering all its forms,
-# live in `Propagator`. This method interpolates and stamps in one act: it is the slot's only
-# producer of values, and the two counters it stamps against advance elsewhere (the step and the
-# push), so the deposit is the pure closing measurement of both.
-function deposit!(cache::ObservablesCache, tracers::Tracers, u; traversal = nothing)
-  cache.velocity_at_particles === nothing &&
-    throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
-                        "`number_of_particles` matching the tracer set"))
-  interpolate!(cache.velocity_at_particles, u, tracers.positions, tracers.interpolation_scheme;
-               traversal = _order(traversal))
-  deposit_velocity_at_particles!(cache)
-  return cache
-end
-
-
-"""
-    advect!(scheme, tracers, velocity_end, domain, buffers, dt;
-            traversal = nothing) -> tracers
-
-Advance the positions of a tracer set by one step, in place.
-
-# Arguments
-- `scheme` — the particle integration scheme, an [`AbstractParticleIntegrator`](@ref).
-- `tracers` — the tracer set whose positions advance.
-- `velocity_end` — the end-of-step velocity field ``\\boldsymbol{u}(t_{n+1})`` in physical representation.
-- `domain` — the [`FixedDomain`](@ref), which supplies the box side the positions are wrapped into.
-- `buffers` — the scheme's working storage, the [`ParticleIntegratorBuffers`](@ref) that
-  [`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers) builds for it.
-- `dt` — the step size ``\\Delta t``.
-- `traversal = nothing` — a [`ParticleTraversal`](@ref), to gather the velocity in its
-  memory-locality order; `nothing` gathers in tracer order, with identical values.
-
-Under [`Heun`](@ref), whose docstring gives the update, the scheme is Heun-in-time on the velocity
-at the two ends of the step — the start-of-step values the previous iteration's closing particle
-deposit stored, and `velocity_end`.
-
-Every push also advances the cache's particles epoch, the version of the positions, so a read of
-the previous velocity sample throws as stale until the particle deposit closing the iteration
-refreshes it. A hand-run loop gets the same protection as a run.
-
-Under [`AdamsBashforth`](@ref), whose docstring gives the update, the position update integrates
-over the deposited samples instead of interpolating a second time. The first ``K - 1`` pushes, with
-``K`` the order, have no history yet and are taken under `Heun`; `velocity_end` feeds only those
-bootstrap pushes.
-
-!!! note "The start-of-step velocity is read, never recomputed"
-    The start-of-step velocity ``\\boldsymbol{v}_1`` comes from the cache's stored velocity at the
-    particles, not recomputed here: it must hold
-    ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, deposited by the particle
-    form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) at the previous
-    iteration's end. The run's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) checks that it is current before each push; a hand-run
-    loop must make that deposit itself between advances.
-"""
-function advect! end
-
-function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
-                 buffers::ParticleIntegratorBuffers, dt::Real; traversal = nothing)
-  Δt = real(eltype(point_positions(tracers.positions)))(dt)
-  # The predictor displacement, wrap fused (PF decision 73): X* = X + Δt·v₁, reduced to the box.
-  v₁ = buffers.cache.velocity_at_particles
-  displace!(buffers.predictor_points, tracers.positions, domain.grid,
-            (Δt, v₁))
-  # v₂ is evaluated at the PREDICTOR positions and is a stage register, never the deposited velocity sample —
-  # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse
-  # would corrupt the recorded observable the Lagrangian statistics accumulate (never approximate
-  # the thing you measure). The traversal order built over the tracers serves this gather too: the
-  # predictor positions sit one step's displacement from them, inside the tiles the order groups,
-  # and the field library admits any same-length order.
-  interpolate!(buffers.velocity_predictor, velocity_end, buffers.predictor_points,
-               tracers.interpolation_scheme; traversal = _order(traversal))
-  # The corrector: one fused two-term displacement, wrap included.
-  displace!(tracers.positions, domain.grid,
-            (Δt / 2, v₁), (Δt / 2, buffers.velocity_predictor))
-  # The unwrapped positions take the SAME terms through the grid-free form: winding kept, and the
-  # two records share the displacement by construction.
-  tracers.unwrapped_positions === nothing ||
-    displace!(tracers.unwrapped_positions,
-              (Δt / 2, v₁), (Δt / 2, buffers.velocity_predictor))
-  # The positions changed, so the particles counter moves (decision 76) and the previously deposited
-  # sample reads stale until the closing particle deposit. This keeps the two-epoch guard live on a
-  # hand-run loop, not only under `advance!`.
-  advance_particles_epoch!(buffers.cache)
-  return tracers
 end
 
 
@@ -780,17 +345,318 @@ new_scalar_point_values(tracers::Tracers) =
                             npoints(tracers.positions)))
 
 
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# The trail: a fixed number of slots used as a ring. Nothing is ever copied from slot to slot — a
+# new sample is written into the slot after the newest, which is the oldest once the ring is full.
+# A slot is readable exactly while it lies in the index range `1 - filled : 0`; a slot outside it
+# (never filled, or handed out to be written) is reachable by no public call.
+
+"""
+    ParticleTrail(allocator, tracers, capacity)
+
+The last few samples of one quantity at the particles, each kept with the simulation time it was
+taken at — the record a time derivative along the trajectories is computed from
+([`time_derivative!`](@ref)). A *sample* is the quantity's value at every particle together with its
+time. The trail keeps at most `capacity` of them, and adding one to a full trail drops the oldest:
+it serves derivatives, and a long history is the caller's to keep, more sparsely.
+
+# Arguments
+- `allocator` — a function of `tracers` that returns one fresh point-values object:
+  [`new_scalar_point_values`](@ref) or [`new_vector_point_values`](@ref). It is called `capacity`
+  times, so the trail owns all of its storage and adding a sample allocates nothing.
+- `tracers` — the [`Tracers`](@ref) the values are sized to.
+- `capacity` — the largest number of samples kept, at least 1.
+
+A sample is read by its offset in steps from the newest: `trail[0]` is the newest, `trail[-1]` the
+one before it, and each is a named pair, `trail[-1].time` and `trail[-1].value`. A positive
+index, or one further back than the samples present, is an `ArgumentError`. `length(trail)` is the
+number of samples present, and iteration runs from the oldest to the newest. A value is the
+trail's own storage, to be read and never written.
+
+A sample is added with `push!`, which hands the storage to a function to fill — here a
+[`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments) —
+and labels it with the time `t`, which must be later than the newest sample's. If the function
+throws, no sample is added, and a full trail has by then given up its oldest:
+
+```julia
+push!(trail, t) do value
+    interpolate_at_particles!(value, field, tracers)
+end
+```
+
+The trail a run keeps for the velocity, read through
+[`velocity_at_particles_trail`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles_trail),
+is filled by the run alone and refuses `push!`.
+
+# Examples
+The scalar along the trajectories and its rate of change, sampled once per iteration:
+
+```julia
+trail = ParticleTrail(new_scalar_point_values, sim.tracers, 3)
+rate = new_scalar_point_values(sim.tracers)
+run!(sim) do s
+    push!(trail, current_time(s)) do value
+        interpolate_at_particles!(value, scalar_physical(s.cache), s.tracers)
+    end
+    length(trail) == 3 && time_derivative!(rate, trail)
+    current_step(s) < 100
+end
+```
+
+# Fields
+These are the trail's internals; read a trail through its indexing, never through them.
+
+- `values`, `times` — the slots of the ring, one point-values object each, and the time of the
+  sample in each.
+
+- `newest`, `filled` — the slot of the newest sample, and how many slots hold one.
+
+- `cache_owned` — whether the trail is a run's own, which `push!` refuses.
+
+- `nodes`, `weights` — host scratch of `time_derivative!`.
+"""
+mutable struct ParticleTrail{V <: AbstractPointValues}
+  const values::Vector{V}           # `capacity` point-value objects, the ring's slots
+  const times::Vector{Float64}      # the time of the sample in each slot
+  newest::Int                       # the slot of the newest sample; 0 while the trail is empty
+  filled::Int                       # how many slots hold a sample, 0 … capacity
+  const cache_owned::Bool           # the run's own trail: only the particle deposit adds to it
+  # Host scratch of `time_derivative!`: the nodes and the differentiation weights, sized once.
+  const nodes::Vector{Float64}
+  const weights::Matrix{Float64}
+end
+
+function _new_trail(allocator, tracers::Tracers, capacity::Integer, cache_owned::Bool)
+  capacity >= 1 ||
+    throw(ArgumentError("`capacity` must be at least 1, got $capacity: a trail holds at least " *
+                        "its newest sample"))
+  first_slot = allocator(tracers)
+  first_slot isa AbstractPointValues ||
+    throw(ArgumentError("`allocator(tracers)` must return a `GBGPeriodicFields` point-values " *
+                        "object — pass `new_scalar_point_values` or `new_vector_point_values`; " *
+                        "it returned a $(typeof(first_slot))"))
+  values = typeof(first_slot)[first_slot]
+  for _ in 2:capacity
+    push!(values, allocator(tracers))
+  end
+  return ParticleTrail(values, zeros(Float64, capacity), 0, 0, cache_owned,
+                       zeros(Float64, capacity), zeros(Float64, capacity, capacity))
+end
+
+ParticleTrail(allocator, tracers::Tracers, capacity::Integer) =
+  _new_trail(allocator, tracers, capacity, false)
+
+# The capacity a particle integration scheme needs of the run's velocity trail. The generic is here,
+# where the trail is, so that the cache can size its trail from the scheme; the schemes add their
+# methods in `ParticlePropagator`.
+function trail_capacity end
+
+_capacity(trail::ParticleTrail) = length(trail.values)
+
+# The slot of the sample `offset` steps back from the newest (`offset <= 0`, already checked).
+_slot(trail::ParticleTrail, offset::Integer) = mod1(trail.newest + offset, _capacity(trail))
+
+# The storage the next sample is written into. On a full trail the oldest sample is retired first,
+# so a slot being written is already outside the readable range — and stays there if the writing
+# fails. Asking twice returns the same slot: the second call finds the trail no longer full.
+function _next_slot!(trail::ParticleTrail)
+  trail.filled == _capacity(trail) && (trail.filled -= 1)
+  return trail.values[_slot(trail, 1)]
+end
+
+function _check_time(trail::ParticleTrail, t::Real)
+  isfinite(t) || throw(ArgumentError("a sample's time must be finite, got $t"))
+  trail.filled == 0 || t > trail.times[trail.newest] ||
+    throw(ArgumentError("a sample's time must be later than the newest sample's, " *
+                        "$(trail.times[trail.newest]); got $t"))
+  return Float64(t)
+end
+
+# Make the slot `_next_slot!` handed out the newest sample, at time `t`.
+function _commit!(trail::ParticleTrail, t::Float64)
+  slot = _slot(trail, 1)
+  trail.times[slot] = t
+  trail.newest = slot
+  trail.filled += 1
+  return trail
+end
+
+function _push!(fill_value!, trail::ParticleTrail, t::Real)
+  time = _check_time(trail, t)
+  fill_value!(_next_slot!(trail))
+  return _commit!(trail, time)
+end
+
+_empty!(trail::ParticleTrail) = (trail.newest = 0; trail.filled = 0; trail)
+
+function Base.push!(fill_value!::Function, trail::ParticleTrail, t::Real)
+  trail.cache_owned &&
+    throw(ArgumentError("this trail belongs to a run's observables cache, and the particle " *
+                        "deposit closing each iteration is its only writer; keep a trail of " *
+                        "your own with `ParticleTrail(allocator, tracers, capacity)`"))
+  return _push!(fill_value!, trail, t)
+end
+
+# The two calls a reader of Base's `push!(collection, item)` would try. The trail hands out its own
+# storage to be filled, so that adding a sample copies nothing; there is no form taking the values.
+Base.push!(::ParticleTrail, ::Real) =
+  throw(ArgumentError("a sample is added by filling the trail's own storage: " *
+                      "`push!(trail, t) do value … end`"))
+Base.push!(::ParticleTrail, ::AbstractPointValues, ::Real) =
+  throw(ArgumentError("a sample is added by filling the trail's own storage, so nothing is " *
+                      "copied: `push!(trail, t) do value … end`, writing into `value`"))
+
+Base.length(trail::ParticleTrail) = trail.filled
+Base.isempty(trail::ParticleTrail) = trail.filled == 0
+Base.firstindex(trail::ParticleTrail) = 1 - trail.filled
+Base.lastindex(::ParticleTrail) = 0
+Base.keys(trail::ParticleTrail) = firstindex(trail):0
+Base.eltype(::Type{ParticleTrail{V}}) where {V} = @NamedTuple{time::Float64, value::V}
+
+function Base.getindex(trail::ParticleTrail, offset::Integer)
+  offset <= 0 ||
+    throw(ArgumentError("a trail is indexed by the offset in steps from its newest sample: " *
+                        "`trail[0]` is the newest and `trail[-1]` the one before it; got $offset"))
+  offset >= 1 - trail.filled ||
+    throw(ArgumentError(offset >= 1 - _capacity(trail) ?
+      "the trail holds only $(trail.filled) sample(s) so far, so it has no `trail[$offset]`" :
+      "the trail's capacity is $(_capacity(trail)), so it never has a `trail[$offset]`"))
+  slot = _slot(trail, offset)
+  return (time = trail.times[slot], value = trail.values[slot])
+end
+
+Base.iterate(trail::ParticleTrail, offset::Int = firstindex(trail)) =
+  offset > 0 ? nothing : (trail[offset], offset + 1)
+
+
+# The weights of the derivatives of order 0 … `order` at zero of the polynomial through values at
+# the first `n` of `nodes`: `weights[j, m + 1]` multiplies the value at node `j` in the derivative
+# of order `m`. Fornberg's recursion (1988), which is stable on unevenly spaced nodes and costs
+# O(n² · order) host arithmetic.
+function _derivative_weights!(weights::Matrix{Float64}, nodes::Vector{Float64}, n::Int, order::Int)
+  fill!(weights, 0.0)
+  weights[1, 1] = 1.0
+  product = 1.0
+  previous_node = nodes[1]
+  for i in 2:n
+    highest = min(i - 1, order)
+    new_product = 1.0
+    last_node = previous_node
+    previous_node = nodes[i]
+    for j in 1:i-1
+      distance = nodes[i] - nodes[j]
+      new_product *= distance
+      if j == i - 1
+        for m in highest:-1:1
+          weights[i, m + 1] = product * (m * weights[i - 1, m] - last_node * weights[i - 1, m + 1]) / new_product
+        end
+        weights[i, 1] = -product * last_node * weights[i - 1, 1] / new_product
+      end
+      for m in highest:-1:1
+        weights[j, m + 1] = (nodes[i] * weights[j, m + 1] - m * weights[j, m]) / distance
+      end
+      weights[j, 1] = nodes[i] * weights[j, 1] / distance
+    end
+    product = new_product
+  end
+  return weights
+end
+
+# `out ← Σ coefficient · values` over the terms, or `out ← out + Σ …` when `continued`: one checked
+# point-value broadcast, so the sum is a single pass on the CPU and a single kernel on a device.
+function _assign_combination!(out::AbstractPointValues, terms::Tuple, continued::Bool)
+  products = map(term -> Base.Broadcast.broadcasted(*, term[1], term[2]), terms)
+  total = length(products) == 1 ? products[1] : Base.Broadcast.broadcasted(+, products...)
+  Base.Broadcast.materialize!(out, continued ? Base.Broadcast.broadcasted(+, out, total) : total)
+  return out
+end
+
+# How many samples one pass combines; a longer trail takes further passes, each continuing the sum.
+const _TERMS_PER_PASS = 8
+
+
+"""
+    time_derivative!(out, trail; order = 1) -> out
+
+The time derivative of the quantity a [`ParticleTrail`](@ref) holds, at the time of its newest
+sample: writing ``f(t)`` for the quantity at one particle along its trajectory, ``\\mathrm{d}^{m}f/\\mathrm{d}t^{m}``
+at ``t_n``, with ``m`` the order. For the run's velocity trail and ``m = 1`` this is the Lagrangian
+acceleration.
+
+It is the derivative of the polynomial through all the samples present, taken at their actual,
+possibly uneven times. With ``d`` samples spaced ``\\Delta t`` apart the error is of order
+``\\Delta t^{d - m}``, so the trail's capacity bounds the accuracy and a higher derivative needs a
+longer trail.
+
+# Arguments
+- `out` — the point-values object written, of the same kind as the trail's values and not one of them.
+- `trail` — the `ParticleTrail` to differentiate; it must hold at least `order + 1` samples, or
+  the call is an `ArgumentError`.
+- `order = 1` — the order ``m`` of the derivative; `0` copies the newest value.
+
+The weights are computed on the host from the samples' times, by Fornberg's recursion,
+and the values are combined in one pass over the particles, without allocating at their scale.
+"""
+function time_derivative!(out::AbstractPointValues, trail::ParticleTrail; order::Integer = 1)
+  order >= 0 || throw(ArgumentError("`order` must be non-negative, got $order"))
+  n = trail.filled
+  n >= order + 1 ||
+    throw(ArgumentError("a derivative of order $order needs at least $(order + 1) samples, and " *
+                        "the trail holds $n"))
+  any(value -> value === out, trail.values) &&
+    throw(ArgumentError("`out` is one of the trail's own values; a derivative is written into " *
+                        "storage the caller owns"))
+  newest = trail[0]
+  # A broadcast would spread a scalar per particle over the three components of a vector `out`
+  # without complaint, so the kind is checked here; the count is the broadcast's own check.
+  (point_value_tensor_order(out) == point_value_tensor_order(newest.value) &&
+   eltype(out) == eltype(newest.value)) ||
+    throw(ArgumentError("`out` must be point values of the trail's own kind, " *
+                        "$(nameof(typeof(newest.value))){$(eltype(newest.value))}; got " *
+                        "$(nameof(typeof(out))){$(eltype(out))}"))
+  if order == 0
+    Base.Broadcast.materialize!(out, Base.Broadcast.broadcasted(identity, newest.value))
+    return out
+  end
+  for j in 1:n
+    trail.nodes[j] = trail[1 - j].time - newest.time     # relative to the newest: 0, then negative
+  end
+  _derivative_weights!(trail.weights, trail.nodes, n, Int(order))
+  T = eltype(out)
+  for first in 1:_TERMS_PER_PASS:n
+    last = min(first + _TERMS_PER_PASS - 1, n)
+    terms = ntuple(i -> (T(trail.weights[first + i - 1, order + 1]), trail[2 - first - i].value),
+                   last - first + 1)
+    _assign_combination!(out, terms, first > 1)
+  end
+  return out
+end
+
+
+"""
+    time_derivative(trail; order = 1)
+
+The time derivative of the quantity a [`ParticleTrail`](@ref) holds, at the time of its newest
+sample, in a newly allocated point-values object: the allocating form of
+[`time_derivative!`](@ref), whose docstring states what is computed and how accurately.
+
+# Arguments
+- `trail` — the `ParticleTrail` to differentiate; one that holds no sample is an `ArgumentError`.
+- `order = 1` — the order of the derivative; `0` returns a copy of the newest value.
+"""
+function time_derivative(trail::ParticleTrail; order::Integer = 1)
+  isempty(trail) &&
+    throw(ArgumentError("the trail holds no sample yet, so it has no derivative of any order"))
+  return time_derivative!(similar_point_values(trail.values[1]), trail; order)
+end
+
+
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # Display (the convention is stated once, at `SimulationDomain`'s display section). A tracer set
 # is its positions through the field library's `show` (count, element type, storage — what a run
 # refuses a tracer set on), its interpolation scheme, and the unwrapped record, which the unwrapped
-# read refuses on — through its own display when kept, `no unwrapped positions` when not. The
-# scheme prints as the constructor call that rebuilds it.
-# A register set is its predictor (the only display of the package still growing with the particle
-# count, so it leads) and its order — the depth of history it holds, which the cache is matched on.
-
-Base.show(io::IO, ::AdamsBashforth{K}) where {K} = print(io, "AdamsBashforth(order = ", K, ")")
+# read refuses on — through its own display when kept, `no unwrapped positions` when not.
 
 function Base.show(io::IO, tracers::Tracers)
   print(io, "Tracers(", tracers.positions, ", ", tracers.interpolation_scheme)
@@ -807,12 +673,18 @@ function Base.show(io::IO, ::MIME"text/plain", tracers::Tracers)
   row("unwrapped_positions", something(tracers.unwrapped_positions, "nothing (no unwrapped positions)"))
 end
 
+# A trail is its values' kind and count through the field library's display of one slot, the
+# capacity a scheme matches it on, how many samples it holds, and the newest one's time.
+function Base.show(io::IO, trail::ParticleTrail)
+  print(io, "ParticleTrail(", trail.values[1], ", capacity ", _capacity(trail), ", ")
+  trail.filled == 0 ? print(io, "no samples") :
+    print(io, trail.filled, trail.filled == 1 ? " sample" : " samples", ", newest at time ",
+          trail.times[trail.newest])
+  print(io, ")")
+end
+
 Base.show(io::IO, traversal::ParticleTraversal) =
   print(io, "ParticleTraversal(", traversal.order, traversal.automatic ? ", automatic" : ", manual", ")")
-
-Base.show(io::IO, buffers::ParticleIntegratorBuffers) =
-  print(io, "ParticleIntegratorBuffers(", buffers.predictor_points,
-        isempty(buffers.weights) ? ", one-step" : ", order $(length(buffers.weights))", ")")
 
 
 
@@ -858,6 +730,46 @@ the file or the read is refused with an `ArgumentError`, as is a group not writt
 - `domain` — the `FixedDomain` whose backend the rebuilt set lives on.
 """
 function read_tracers end
+
+
+export write_trail, read_trail
+
+
+"""
+    write_trail(parent::HDF5.H5DataStore, name::AbstractString, trail::ParticleTrail)
+
+Write the [`ParticleTrail`](@ref) `trail` under `parent` as one self-describing HDF5 group: its
+capacity and every sample it holds, the values through `GBGPeriodicFields`' own pair and the
+times beside them. Available once the `HDF5` package is loaded; the caller owns the file.
+
+A run's checkpoint stores the run's own velocity trail; a trail the caller keeps is the caller's
+to store, with this function.
+
+# Arguments
+- `parent` — the open HDF5 file or group to write under.
+- `name` — the created group's name.
+- `trail` — the trail to record.
+
+Returns the created group. Reload with [`read_trail`](@ref).
+"""
+function write_trail end
+
+
+"""
+    read_trail(parent::HDF5.H5DataStore, name::AbstractString,
+               tracers::Tracers) -> ParticleTrail
+
+Rebuild a [`ParticleTrail`](@ref) from the group [`write_trail`](@ref) wrote, with the stored
+capacity, samples and times, its storage allocated on the backend of `tracers`. A group not written
+by `write_trail`, or one whose values do not fit `tracers` in count or element type, is refused
+with an `ArgumentError`. Available once the `HDF5` package is loaded.
+
+# Arguments
+- `parent` — the open HDF5 file or group holding the trail's group.
+- `name` — the group's name.
+- `tracers` — the [`Tracers`](@ref) the rebuilt trail's values are sized to.
+"""
+function read_trail end
 
 
 end # module Particles

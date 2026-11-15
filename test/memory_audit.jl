@@ -9,10 +9,10 @@
 #     plus a per-forcing DELTA table and a tracer DELTA, and an exhaustive sweep over the whole
 #     product (~360 combinations) asserts measured = base + deltas, cell by cell. Adding or removing
 #     a buffer anywhere fails the suite: a footprint change must be a conscious, recorded decision,
-#     never a drive-by. (The particle-scheme axis carries two points: `Heun`, which enters as
-#     on/off, and `AdamsBashforth{K}`, whose sample history adds K−1 (M, 3) arrays — priced below,
-#     since they scale with the ORDER and not with the grid; precision, backend, and the
-#     interpolation scheme change bytes, never counts.)
+#     never a drive-by. (The particle scheme adds nothing at field scale, whichever it is: what it
+#     costs is arrays of M rows, counted by the particle-scale ledger below against a bound read off
+#     the scheme's formula; precision, backend, and the interpolation scheme change bytes, never
+#     counts.)
 #
 #  2. THE FRAME LEDGER — the same walk over what a run does NOT evolve: the read-only `FixedDomain`
 #     and its per-mode symbols. This storage sat outside every ledger until 2026-07-30 and is not
@@ -166,10 +166,11 @@ end
 # container the fused exponential's per-mode offset takes — so a rate-carrying forcing shows one
 # spectral scalar (the rate) and nothing else.
 
-# Tracers cost NOTHING at field scale: everything they hold is O(M) — positions, the Heun predictor,
-# and the two interpolated point-value sets. The start-of-step endpoint velocity is recorded onto the
-# tracers as M interpolated vectors rather than retained as a field, so a tracked run adds no resident
-# field to an untracked one. This zero is the assertion, not a placeholder.
+# Tracers add no array of the grid's size: the velocity a particle scheme works from is kept as
+# samples at the M tracers, never as a field, so a tracked run holds the same field-scale arrays as
+# an untracked one. This zero is the assertion, not a placeholder. What tracers DO cost is counted in
+# arrays of M rows, and that count has a ledger of its own with a bound of its own: the testset
+# "the particle-scale ledger" below.
 const TRACER_DELTA = ZERO
 
 # There is no observables axis any more (decision 40): the cache's contents are automatic — exactly
@@ -531,29 +532,81 @@ end   # claims from the one register (audit_ops.jl)
           _add(FRAME, _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:band, :velocity)))
   end
 
-  @testset "tracer storage scales with M, not N — and splits state from observable from scheme" begin
-    # Four (M, 3) arrays in total, owned by THREE different values, and WHICH owns which is the
-    # invariant (decisions 50 and 67). The tracer set holds trajectory STATE only — the positions;
-    # the recorded Lagrangian velocity is an OBSERVABLE, so its slot is the cache's like every
-    # other slot; the predictor pair belongs to the scheme's registers, so a different scheme
-    # changes that count and neither of the others.
-    tracers = Tracers(domains[:TwoThirds]; number_of_particles = 4, interpolation_scheme = CatmullRom, rng = MersenneTwister(1))
-    tcache = ObservablesCache(domains[:TwoThirds]; number_of_particles = 4)
-    buffers = allocate_buffers(Heun(), tracers, tcache)
-    _m_arrays(owner) = (acc = AbstractArray[];
-                        collect_field_arrays!(acc, owner, Set{UInt}(), 2; keep = a -> length(a) >= 4);
-                        [a for a in acc if size(a) == (4, 3)])
-    @test length(_m_arrays(tracers)) == 1                  # positions — state, nothing else
-    @test length(_m_arrays(tcache)) == 1                   # velocity_at_particles — the cache's slot
-    # The scheme's OWN registers: walked from `buffers` the count includes the cache it references,
-    # so the cache's arrays are subtracted by identity.
-    cache_ids = Set(objectid.(_m_arrays(tcache)))
-    @test length([a for a in _m_arrays(buffers) if !(objectid(a) in cache_ids)]) == 2
-    # The split moved storage; it did not add any: 1 + 1 + 2 unique arrays.
-    @test length(unique(objectid, vcat(_m_arrays(tracers), _m_arrays(tcache), _m_arrays(buffers)))) == 4
-    # And neither a scheme register nor the observable hides in the state.
-    @test isempty(intersect((:predictor, :predictor_points, :velocity_predictor, :velocity_at_particles),
-                            fieldnames(Tracers)))
+  # THE PARTICLE-SCALE LEDGER. Storage that scales with the tracer count M is counted in arrays of M
+  # rows and held against a bound, in both directions.
+  #
+  # THE BOUND is read off each scheme's update formula, not off the code: one array for the positions,
+  # which are advanced in place; one more when the unwrapped positions are tracked; and one per
+  # velocity value the formula has alive at once. `AB(k)` sums k samples, f(tₙ) … f(tₙ₋ₖ₊₁). `ABM(k)`
+  # corrects with those k and the velocity at the predicted positions, k + 1 values, and needs them
+  # together: the predicted value must be evaluated before the correction, and the correction still
+  # reads the oldest sample. Nothing else in a step is of the particles' size.
+  #
+  # Before this ledger the count was frozen from the implementation with nothing to hold it against,
+  # and the multistep scheme carried the two arrays of its Heun start-up for the whole run unnoticed
+  # (2026-11-13).
+  @testset "the particle-scale ledger" begin
+    M = 37                                       # shared by no grid-derived size, so a row count names a particle array
+    velocity_values(::AB{k}) where {k} = k       # the samples of the Adams–Bashforth sum
+    velocity_values(::ABM{k}) where {k} = k + 1  # …and the value at the predicted positions
+    bound(scheme, unwrapped) = 1 + (unwrapped ? 1 : 0) + velocity_values(scheme)
+    particle_arrays(owner) = (acc = AbstractArray[];
+                              collect_field_arrays!(acc, owner, Set{UInt}(), N_AUDIT;
+                                                    keep = a -> ndims(a) >= 1 && size(a, 1) == M);
+                              acc)
+    tracked(scheme, unwrapped; traversal_mode = :none) =
+      Simulation(domains[:TwoThirds]; viscosity = 0.1, rng = MersenneTwister(1),
+                 particles = ParticleTracking(; number_of_particles = M, particle_integration_scheme = scheme,
+                                              unwrapped, traversal_mode))
+
+    @testset "allocated equals the bound from the scheme's formula" begin
+      for scheme in (Heun(), AB.(1:4)..., ABM.(2:4)..., AB(8), ABM(7)), unwrapped in (false, true)
+        sim = tracked(scheme, unwrapped)
+        for _ in 1:3; advance!(sim); end         # nothing a step does may add to it
+        arrays = particle_arrays(sim)
+        # Every array of M rows the run reaches is one vector per tracer…
+        @test all(a -> size(a) == (M, 3), arrays)
+        # …and there are exactly as many as the formula needs: one more would be storage the scheme
+        # never reads, one fewer a walk that missed an owner.
+        @test length(arrays) == bound(scheme, unwrapped)
+      end
+    end
+
+    @testset "who owns what" begin
+      # The tracer set holds trajectory STATE only (decision 50); the samples are OBSERVABLES, so
+      # they are the cache's (decision 67); a scheme holds nothing at all.
+      for (scheme, unwrapped) in ((Heun(), false), (AB(3), true), (ABM(3), true))
+        sim = tracked(scheme, unwrapped)
+        @test length(particle_arrays(sim.tracers)) == 1 + (unwrapped ? 1 : 0)
+        @test length(particle_arrays(sim.cache)) == velocity_values(scheme)
+        @test isempty(particle_arrays(sim.particle_integration_scheme))
+        @test isempty(intersect(objectid.(particle_arrays(sim.tracers)), objectid.(particle_arrays(sim.cache))))
+        @test fieldnames(Tracers) == (:positions, :interpolation_scheme, :unwrapped_positions)
+      end
+    end
+
+    @testset "every array of M rows is named" begin
+      # With the traversal order on, the run also holds its three M-vectors, and nothing else: an
+      # array of M rows that is neither a vector per tracer nor one of these would be unaccounted for.
+      sim = tracked(ABM(2), true; traversal_mode = :automatic)
+      for _ in 1:3; advance!(sim); end
+      named = Set([(Float64, (M, 3)), (Int32, (M,)), (Int64, (M,)), (Bool, (M,))])
+      arrays = particle_arrays(sim)
+      @test all(a -> (eltype(a), size(a)) in named, arrays)
+      @test count(a -> size(a) == (M, 3), arrays) == bound(ABM(2), true)
+      @test count(a -> size(a) == (M,), arrays) == 3
+    end
+
+    @testset "the ledger can fail" begin
+      # A bound that cannot fail is not a bound: one array too many, hung where the walk reaches it,
+      # is counted, and one the run needs, hidden from the walk, is missed.
+      sim = tracked(AB(3), false)
+      surplus = (run = sim, forgotten = zeros(M, 3))
+      @test length(particle_arrays(surplus)) == bound(AB(3), false) + 1
+      @test length(particle_arrays(sim.cache)) == bound(AB(3), false) - 1
+      # …and a scheme given another's bound does not meet it.
+      @test length(particle_arrays(tracked(ABM(3), false))) != bound(AB(3), false)
+    end
   end
 
   @testset "the traversal order is O(M) + O(tiles), owned by the run's ParticleTraversal alone" begin
@@ -561,7 +614,7 @@ end   # claims from the one register (audit_ops.jl)
     # by the tracer count and the tile count, never the grid — three M-vectors (the Int32 order, the
     # Int64 tile keys, the Bool validation mask) and two vectors of the tile count (the counting
     # sort's counts and offsets, (N/4)³ + 2 entries each at the default tile size 4). No (M, 3)
-    # array joins the four above, and no field-scale array appears: the `FRAME + BASE + TRACER_DELTA`
+    # array joins the ledger's above, and no field-scale array appears: the `FRAME + BASE + TRACER_DELTA`
     # ledger over a tracked run holds with TRACER_DELTA still ZERO (asserted above).
     M = 4
     sim = Simulation(domains[:TwoThirds]; viscosity = 0.1, particles = ParticleTracking(number_of_particles = M),
@@ -580,10 +633,10 @@ end   # claims from the one register (audit_ops.jl)
     @test any(a -> a === traversal.order.indices, owned)      # the order itself is among them
     # The order is a permutation of the tracers — a stale order is never wrong, only less useful.
     @test sort(Int.(Array(traversal.order.indices))) == 1:M
-    # No other owner reaches the traversal's arrays: the tracers, the cache, and the scheme's registers
-    # hold exactly the four (M, 3) arrays counted above and nothing of the order.
+    # No other owner reaches the traversal's arrays: the tracers and the cache hold the (M, 3)
+    # arrays the ledger counts and nothing of the order.
     traversal_ids = Set(objectid.(owned))
-    for owner in (sim.tracers, sim.cache, sim.particle_buffers)
+    for owner in (sim.tracers, sim.cache)
       @test isempty([a for a in _m_arrays(owner) if objectid(a) in traversal_ids])
     end
     # Opted out, the run holds nothing of it.
@@ -591,35 +644,6 @@ end   # claims from the one register (audit_ops.jl)
                      particles = ParticleTracking(number_of_particles = M, traversal_mode = :none),
                      rng = MersenneTwister(1))
     @test off.particle_traversal === nothing
-  end
-
-  # The multistep scheme's extra storage is its SAMPLE HISTORY, and the history is a deposited
-  # observable — so it is priced on the cache, not on the scheme's registers, and it scales with the
-  # order rather than with the grid. Nothing else about the scheme costs storage: its weight solve
-  # works in two `order`-element host vectors and its bootstrap reuses the one-step registers.
-  @testset "the multistep particle integration scheme prices its history, and nothing else" begin
-    domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
-                         array_family = Array, dealiasing = TwoThirds())
-    tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom)
-    m_arrays(owner) = (acc = AbstractArray[];
-                       collect_field_arrays!(acc, owner, Set{UInt}(), 2; keep = a -> length(a) >= 4);
-                       [a for a in acc if size(a) == (4, 3)])
-    for K in (1, 2, 4, 8)
-      cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),
-                               history_depth = K)
-      buffers = allocate_buffers(AdamsBashforth(order = K), tracers, cache)
-      @test length(cache.velocity_at_particles_history) == K - 1     # the whole of the order's cost
-      # …priced by the arrays the walk reaches, not by the slot count: the history is a `Vector` of
-      # point-value structs, which the first walk never descended into.
-      @test length(m_arrays(cache)) == 1 + (K - 1)
-      # The scheme's OWN registers are the bootstrap pair and nothing else. Walked from `buffers`
-      # the count would be one higher, because the buffers now reach the cache holding the history —
-      # which is the point of the refactor, and is priced on the line above, not here.
-      startup_own = [a for a in m_arrays(buffers)
-                     if !(objectid(a) in Set(objectid.(m_arrays(cache))))]
-      @test length(startup_own) == 2
-      @test length(cache.history_steps) == K - 1                  # host scalars, one per past sample
-    end
   end
 
   @testset "op lists name real registers" begin

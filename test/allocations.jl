@@ -20,18 +20,21 @@ using Test
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 using Random
+import GBGPeriodicFields
 using Logging
 using GBGHomogeneousTurbulence.Generator: prepare!, finalize!, velocity_rhs!, scalar_rhs!
 using GBGHomogeneousTurbulence.Forcing: add_forcing_source!, prepare_forcing!, project_forcing!
-using GBGHomogeneousTurbulence.Particles: advect!, new_vector_point_values
+using GBGHomogeneousTurbulence.Particles: new_vector_point_values
+using GBGHomogeneousTurbulence.ParticlePropagator: advect!
 using GBGHomogeneousTurbulence.Propagator: step!, deposit!
 import GBGCodingTools
 using GBGCodingTools.TestHarness: @alloc_below, field_threshold
 include("audit_ops.jl")
+include("cache_counters.jl")
 
 const HT = GBGHomogeneousTurbulence
-const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Cache, HT.Forcing,
-                       HT.Generator, HT.Propagator, HT.Particles, HT.SimulationRun]
+const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Particles, HT.Cache, HT.Forcing,
+                       HT.Generator, HT.Propagator, HT.ParticlePropagator, HT.SimulationRun]
 
 # A forced run with a scalar and tracers on a small CPU grid: every operation reaches its hot path.
 const N = 16
@@ -51,6 +54,16 @@ const SCRATCH = new_vector_field_spectral(DOMAIN)
 const CONTROLLER = VarianceController(DOMAIN; target = 1.5)
 const RESCALING = VarianceRescaling(DOMAIN; target = 1.5, over = :total)
 const SAMPLES = new_vector_point_values(SIM.tracers)
+# What a caller's `push!` is given: a function that fills the trail's next value.
+sample_velocity!(value) = interpolate_at_particles!(value, velocity_physical(CACHE), SIM.tracers)
+const SAMPLE_VELOCITY! = sample_velocity!
+# A trail of three samples, for the time derivative.
+const TRAIL = let trail = ParticleTrail(new_vector_point_values, SIM.tracers, 3)
+  for t in (0.0, 0.1, 0.25)
+    push!(value -> fill!(GBGPeriodicFields.point_values(value), t), trail, t)
+  end
+  trail
+end
 const SEED = Xoshiro(2)                        # one generator, so a row does not count its own construction
 
 const VECTOR_BYTES = sizeof(field_data(U))
@@ -65,11 +78,9 @@ bound(; transforms = 1) = field_threshold(VECTOR_BYTES; components = transforms)
 # reads first, `false` after the iteration. Named, since `@alloc_below` evaluates its call twice.
 const CALLBACK_CALLS = Ref(0)
 one_iteration(sim) = isodd(CALLBACK_CALLS[] += 1)
-# The closing deposits of an iteration, the field form then the particle form, as `advance!` makes them.
-deposit_all!(sim) = (deposit!(sim.cache, sim.state, sim.domain, sim.buffers);
-                     deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache);
-                              traversal = sim.particle_traversal);
-                     sim)
+# Close an iteration a row left open: the field deposit, and the counters put as they stand between
+# iterations (a row that stepped the fields alone has left the positions behind them).
+deposit_all!(sim) = (deposit!(sim.cache, sim.state, sim.domain, sim.buffers); paired!(sim.cache); sim)
 # `step!` opens an iteration its closing deposit must end before the next can begin.
 deposited_cache(sim) = (deposit_all!(sim); sim.cache)
 
@@ -82,7 +93,7 @@ deposited_cache(sim) = (deposit_all!(sim); sim.cache)
                                                              DOMAIN, BUFFERS, deposited_cache(SIM), 1e-3)
     deposit_all!(SIM)
     @alloc_below bound(transforms = 7) deposit!(CACHE, STATE, DOMAIN, BUFFERS)   # recovers u, ω and φ
-    @alloc_below bound() deposit!(CACHE, SIM.tracers, velocity_physical(CACHE))
+    @alloc_below bound() deposit!(ready_for_particle_deposit!(CACHE), SIM.tracers, later())
   end
 
   @testset "the generator" begin
@@ -109,9 +120,12 @@ deposited_cache(sim) = (deposit_all!(sim); sim.cache)
 
   @testset "the particles" begin
     deposit_all!(SIM)
-    @alloc_below bound() advect!(SIM.particle_integration_scheme, SIM.tracers, velocity_physical(CACHE), DOMAIN,
-                                 SIM.particle_buffers, 1e-3)
+    @alloc_below bound() advect!(SIM.particle_integration_scheme, SIM.tracers, DOMAIN,
+                                 ready_for_particle_step!(CACHE), 1e-3)
+    paired!(CACHE)
     @alloc_below bound() interpolate_at_particles!(SAMPLES, velocity_physical(CACHE), SIM.tracers)
+    @alloc_below bound() time_derivative!(SAMPLES, TRAIL)
+    @alloc_below bound() push!(SAMPLE_VELOCITY!, TRAIL, later())
     @alloc_below bound() rebuild_traversal!(SIM)
     deposit_all!(SIM)
   end

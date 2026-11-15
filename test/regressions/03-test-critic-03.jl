@@ -1,17 +1,17 @@
-# Witness test-critic-03 — the AdamsBashforth docstring's convergence claim, measured end to end.
+# Witness test-critic-03 — the `AB` docstring's convergence claim, measured end to end.
 #
-# `AdamsBashforth`'s docstring states that over a fixed window `order = 4` converges at about third
-# order rather than fourth — "3.0 against 2.0 for the two-step method, with an error some fifty times
-# smaller at equal step count" — because the `order - 1` bootstrap steps are taken with
-# `Heun`. Nothing in the suite advanced a trajectory and measured that ratio: the existing
-# checks pin `_adams_bashforth_weights` in isolation, or run `advect!` and only assert that the
-# positions moved and stayed in the box. The wiring between the weight vector `b[j]` and the rotated
-# history `past[j-1]` — a transposition, or an off-by-one in the shift-loop range for K > 2 — is
-# exactly what a convergence ratio detects and a "positions changed" check does not.
+# `AB`'s docstring states that the lower-order steps a multistep scheme starts with leave an error of
+# third order behind, so that over a fixed window `AB(4)` converges at third order rather than
+# fourth. Nothing in the suite once advanced a trajectory and measured that ratio: the checks of the
+# day pinned the weights in isolation, or ran `advect!` and only asserted that the positions moved
+# and stayed in the box. The wiring between the weights and the samples they multiply — a
+# transposition, or an off-by-one in which sample is which — is exactly what a convergence ratio
+# detects and a "positions changed" check does not.
 #
-# The setup mirrors the existing "Heun-in-time is second order" test: a spatially uniform,
-# time-varying velocity u = cos(ωt) x̂, so interpolation is exact and the only error is temporal, and
-# the trajectory is the analytic ∫₀ᵀ cos(ωt) dt.
+# The setup is a spatially uniform, time-varying velocity u = cos(ωt) x̂, so interpolation is exact
+# and the only error is temporal, and the trajectory is the analytic ∫₀ᵀ cos(ωt) dt. (A uniform flow
+# cannot see a scheme's predictor; the orders of the corrected schemes are measured in
+# test/particles.jl on a flow that varies in space.)
 
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions, npoints
@@ -19,10 +19,12 @@ using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test
 
 
+include(joinpath(@__DIR__, "..", "prescribed_flow.jl"))
+
 set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx); uf)
 
 
-@testset "AdamsBashforth(order = 4) converges at third order end to end, order = 2 at second" begin
+@testset "AB(4) converges at third order end to end, AB(2) at second" begin
   T = Float64
   N = 16
   L = 2π
@@ -34,30 +36,21 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   X0 = T[1.0 1.0 1.0]
   exact_x = X0[1, 1] + sin(ω * Tfinal) / ω                    # ∫₀ᵀ cos(ωt) dt
 
-  # One tracer, a fixed step schedule, the two-verb push a run performs: record the sample at tₙ,
-  # then advect. The multistep history is the cache's, so the cache is sized by the scheme's depth.
+  # One tracer, a fixed step schedule, the iteration a run performs: the field at the new time, the
+  # particle step, the sample at the new positions. The cache is built for the scheme.
   final_x(scheme, nsteps) = begin
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),
-                             history_depth = history_depth(scheme))
-    buffers = allocate_buffers(scheme, tracers, cache)
-    u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
-    u_end = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
-    dt = Tfinal / nsteps
-    for n in 0:nsteps-1
-      set_uniform_x!(u_start, cos(ω * n * dt))
-      set_uniform_x!(u_end, cos(ω * (n + 1) * dt))            # only the bootstrap Heun steps read it
-      deposit!(cache, tracers, u_start)
-      advect!(scheme, tracers, u_end, domain, buffers, dt)
-    end
+    cache = ObservablesCache(domain; tracers, particle_integration_scheme = scheme)
+    advect_in_prescribed_flow!((u, t) -> set_uniform_x!(u, cos(ω * t)), scheme, tracers, domain, cache,
+                               fill(Tfinal / nsteps, nsteps))
     point_positions(tracers.positions)[1, 1]
   end
 
   error_ratio(scheme, coarse, fine) = abs(final_x(scheme, coarse) - exact_x) /
                                       abs(final_x(scheme, fine) - exact_x)
 
-  ab4 = AdamsBashforth(order = 4)
-  ab2 = AdamsBashforth(order = 2)
+  ab4 = AB(4)
+  ab2 = AB(2)
 
   # Third order ⇒ halving the step divides the error by ≈ 8. A transposed weight/history pairing or
   # an off-by-one in the shift would drop this to ≈ 2 or ≈ 4.

@@ -1,10 +1,9 @@
-# Witness: a zero-length step must not poison the Adams–Bashforth tracer history.
+# Witness: a zero-length step must not poison the samples an Adams–Bashforth tracer integrates over.
 #
-# `advect!(::AdamsBashforth, …)` stores the step just taken verbatim into `buffers.steps[1]`
-# (src/Particles.jl:391) with no floor, and `advance!` (src/SimulationRun.jl:414) accepts whatever
-# `dt` it is given. A `dt = 0.0` therefore inserts a REPEATED node into the variable-step history:
-# `_adams_bashforth_weights` builds τ[j] = τ[j-1] - steps[j-1] (Particles.jl:345), so τ[j] == τ[j-1],
-# and the Lagrange-basis product divides by (τ[j] - τ[m]) == 0 (Particles.jl:355).
+# The defect: the particle step recorded the step just taken with no floor, and `advance!` accepted
+# whatever `dt` it was given. A `dt = 0.0` therefore put two samples at one time, and the weights,
+# which integrate the Lagrange basis on the samples' times, divided by the difference of two equal
+# times.
 #
 # Correct behaviour, either way round: `advance!` rejects the degenerate step cleanly at the call
 # that supplies it, OR the trajectory survives it with finite positions. What must NOT happen is the
@@ -14,14 +13,14 @@
 using Test, Random
 using GBGPeriodicFields: point_positions
 using GBGHomogeneousTurbulence
-using GBGHomogeneousTurbulence.Particles: AdamsBashforth
+using GBGHomogeneousTurbulence.ParticlePropagator: AB
 
 const N = 16
 const M = 4
 
 build() = Simulation(grid_points_per_axis = N,
                      particles = ParticleTracking(number_of_particles = M,
-                                                  particle_integration_scheme = AdamsBashforth(order = 4)),
+                                                  particle_integration_scheme = AB(4)),
                      rng = MersenneTwister(1234))
 
 # Take the sequence of steps, returning (:ok, positions), (:rejected,) if a zero step was refused

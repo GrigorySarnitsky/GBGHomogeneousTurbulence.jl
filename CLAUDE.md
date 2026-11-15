@@ -83,14 +83,19 @@ functions of state); realization / infrastructure concerns are named by their jo
   does not hold by construction: divergence-free (`helmholtz_projection!`, decision 61) and the
   reality condition on the self-conjugate planes (`reality_projection!`, decision 88 — a forcing
   proportional to the field amplifies its round-off violation until the flow dies).
-- `Particles` — Lagrangian particle tracking: the trajectory state (`Tracers`) held apart from the
-  pluggable trajectory integrator (`AbstractParticleIntegrator`: `Heun`, `AdamsBashforth`) and its per-scheme
-  registers (`ParticleIntegratorBuffers`) — decision 50. *Particle* names anything true of the whole
-  deferred ladder, *tracer* only the massless kind (decision 51).
+- `Particles` — the Lagrangian particles as state and as a place to measure: the trajectory state
+  (`Tracers`), field sampling at it, and the `ParticleTrail` — the last few time-labelled samples of
+  one quantity, with its time derivative along the trajectories (decision 121). *Particle* names
+  anything true of the whole deferred ladder, *tracer* only the massless kind (decision 51). The
+  package never hands out or works on the bare storage of the field library's point values.
+- `ParticlePropagator` — the pluggable trajectory integrators (`AbstractParticleIntegrator`: `Heun`,
+  `AB`, `ABM`) and the particle step, held apart from the trajectory state as `Propagator` is from
+  `State` (decisions 50 and 121). A scheme owns no storage: it integrates over the trail of the
+  velocity at the particles that the observables cache keeps.
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).
 
-Include order: `SimulationDomain → Observables → State → Cache → Forcing → Generator → Propagator →
-Particles → SimulationRun`. Cross-module access only through explicit `using ..Module: name` — never a
+Include order: `SimulationDomain → Observables → State → Particles → Cache → Forcing → Generator →
+Propagator → ParticlePropagator → SimulationRun`. Cross-module access only through explicit `using ..Module: name` — never a
 bare `using`.
 
 **The reference-law module `Phenomenology` is parked** (the owner, 2026-10-16, decision 113). Its
@@ -144,7 +149,7 @@ exemption — so a new type is caught by the suite, not by memory.
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. Storage slots keep descriptive names —
 `cache.vorticity_physical`, `generator.product_spectral`, `state.velocity_spectral`,
-`cache.velocity_at_particles` — as do
+`cache.velocity_at_particles_trail` — as do
 function names (`vorticity_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: symbols for math
 variables, descriptive names for storage. (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)

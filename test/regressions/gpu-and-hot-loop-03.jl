@@ -1,19 +1,19 @@
 # Witness — lane gpu-and-hot-loop, candidate 03.
 #
-# Claim: the per-step tracer advance under `AdamsBashforth` allocates on the host, because
-# `_adams_bashforth_weights` builds two fresh `Vector{Float64}`s (`τ` at Particles.jl:343 and `b`
-# at Particles.jl:347) on every call, while the buffers carried no scratch for them.
+# Claim: the per-step tracer advance under a multistep scheme allocates on the host, because the
+# weight solve built fresh `Vector{Float64}`s on every call, with no scratch kept for them.
 #
 # Scope note, measured here and NOT part of the claim: the tracer path is not allocation-free as a
-# whole — `GBGPeriodicFields`' `interpolate!` allocates 912 bytes per call, so `Heun`'s
-# `advect!` and the particle `deposit!` each cost that much per step whatever the scheme.
-# That is a backend cost, outside this package. The multistep branch of `advect!(::AdamsBashforth, …)`
-# interpolates nothing, so its correct allocation count is exactly zero: the assertions below are
-# achievable by giving the buffers the two weight registers (or by a stack-allocated solve).
+# whole — `GBGPeriodicFields`' `interpolate!` allocates on the host per call, so a corrected step
+# and the particle `deposit!` each cost that much whatever the scheme. That is a backend cost,
+# outside this package. A full `AB` step interpolates nothing, so its correct allocation count is
+# exactly zero: the weights are computed as a tuple, on the stack.
 
 using Test, Random, GBGHomogeneousTurbulence
 
 const HT = GBGHomogeneousTurbulence
+
+include(joinpath(@__DIR__, "..", "cache_counters.jl"))
 
 # @allocated inside a function body, on concrete arguments, so the measurement is of the callee
 # alone and not of global-scope boxing.
@@ -23,39 +23,41 @@ function allocations_of(g, args...)
   return @allocated g(args...)
 end
 
-@testset "the multistep tracer advance allocates nothing once its history is full" begin
+# One particle step of a run, called out of an iteration: the cache's counters are put where the
+# step needs them (which touches no array).
+particle_step!(sim) = advect!(sim.particle_integration_scheme, sim.tracers, sim.domain,
+                              ready_for_particle_step!(sim.cache), 1.0e-3)
+particle_deposit!(sim) = HT.Propagator.deposit!(ready_for_particle_deposit!(sim.cache), sim.tracers, later())
+
+@testset "the multistep tracer advance allocates nothing once its trail is full" begin
 
   # Reference measurement only: the one-step scheme's cost is PF's `interpolate!`, not HT's.
   heun = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
                     particles = ParticleTracking(number_of_particles = 32, particle_integration_scheme = Heun()),
                     rng = MersenneTwister(11))
   for _ in 1:3; advance!(heun); end
-  heun_bytes = allocations_of(advect!, heun.particle_integration_scheme, heun.tracers,
-                              velocity_physical(heun.cache), heun.domain,
-                              heun.particle_buffers, 1.0e-3)
-  interp_bytes = allocations_of(HT.Particles.deposit!, heun.cache, heun.tracers,
-                                velocity_physical(heun.cache))
+  heun_bytes = allocations_of(particle_step!, heun)
+  interp_bytes = allocations_of(particle_deposit!, heun)
   @info "reference: one-step advance and its interpolation" heun_bytes interp_bytes
 
-  # ---- the claim: AdamsBashforth(4), history full (filled == order - 1 == 3), no interpolation --
+  # ---- the claim: AB(4), trail full (four samples), no interpolation -----------------------------
   ab = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
                   particles = ParticleTracking(number_of_particles = 32,
-                                               particle_integration_scheme = AdamsBashforth(order = 4)),
+                                               particle_integration_scheme = AB(4)),
                   rng = MersenneTwister(11))
   for _ in 1:5; advance!(ab); end
-  @test ab.cache.history_filled == 3                      # the multistep branch is the live one
+  @test length(velocity_at_particles_trail(ab.cache)) == 4   # the full step is the live one
 
-  ab_bytes = allocations_of(advect!, ab.particle_integration_scheme, ab.tracers,
-                            velocity_physical(ab.cache), ab.domain,
-                            ab.particle_buffers, 1.0e-3)
-  @info "per-advance host allocations, multistep branch" ab_bytes
+  ab_bytes = allocations_of(particle_step!, ab)
+  @info "per-advance host allocations, full multistep step" ab_bytes
   @test ab_bytes == 0
 
   # ---- and the weight solve itself, isolated: the whole of the above ------------------------
-  weight_bytes = allocations_of(HT.Particles._adams_bashforth_weights,
-                                zeros(Float64, 4), zeros(Float64, 4), 1.0e-3,
-                                [1.0e-3, 1.0e-3, 1.0e-3], 4)
+  weights(nodes, h) = HT.ParticlePropagator._adams_weights(nodes, h)
+  weight_bytes = allocations_of(weights, (0.0, -1.0e-3, -2.0e-3, -3.0e-3), 1.0e-3)
   @info "weight-solve host allocations" weight_bytes
   @test weight_bytes == 0
   @test ab_bytes == weight_bytes                             # the advance's whole cost is the solve
+  # The corrector's weights, on one more node, cost no more.
+  @test allocations_of(weights, (1.0e-3, 0.0, -1.0e-3, -2.0e-3, -3.0e-3), 1.0e-3) == 0
 end

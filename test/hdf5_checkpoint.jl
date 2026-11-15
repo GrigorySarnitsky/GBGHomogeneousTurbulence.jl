@@ -2,7 +2,7 @@
 # one self-describing group, and a restored run continues bitwise where the checkpointed one left
 # off. The leaves are the field library's own persistence (write_field / write_points /
 # write_scheme); nothing derivable is stored, so the reads below also exercise the re-deposit and
-# the fill-aware history restore.
+# the restore of the trail of the velocity at the particles.
 using Test, Random, HDF5
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: CatmullRom, LalescuSpline, PointSet, point_positions, point_values,
@@ -114,11 +114,11 @@ end
 @testset "a restored run continues the checkpointed one bitwise" begin
   path = tempname() * ".h5"
   # A multistep tracer scheme past its bootstrap, a scalar, and the unwrapped record: the
-  # configuration where every stored piece — state, positions, unwrapped record, and the sample
-  # history — is load-bearing for the continuation below.
+  # configuration where every stored piece — state, positions, unwrapped record, and the earlier
+  # samples of the velocity at the particles — is load-bearing for the continuation below.
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = PassiveScalar(),
                    particles = ParticleTracking(number_of_particles = 6,
-                                                unwrapped = true, particle_integration_scheme = AdamsBashforth(order = 2)),
+                                                unwrapped = true, particle_integration_scheme = AB(2)),
                    rng = MersenneTwister(7))
   for _ in 1:4
     advance!(sim; dt = 0.01)
@@ -133,16 +133,21 @@ end
   @test point_positions(sim2.tracers.positions) == point_positions(sim.tracers.positions)
   @test point_positions(unwrapped_positions(sim2.tracers)) ==
         point_positions(unwrapped_positions(sim.tracers))
-  @test sim2.cache.history_filled == sim.cache.history_filled
-  @test sim2.cache.history_steps == sim.cache.history_steps
-  for j in 1:sim.cache.history_filled
-    @test point_values(sim2.cache.velocity_at_particles_history[j]) ==
-          point_values(sim.cache.velocity_at_particles_history[j])
+  # The trail: the same samples at the same times. The earlier ones were stored; the newest was
+  # measured again at the restored positions, and carries the restored clock.
+  trail, trail2 = velocity_at_particles_trail(sim.cache), velocity_at_particles_trail(sim2.cache)
+  @test length(trail2) == length(trail) == 2
+  @test [sample.time for sample in trail2] == [sample.time for sample in trail]
+  @test trail2[0].time === current_time(sim2) === current_time(sim)
+  for (stored, original) in zip(trail2, trail)
+    @test point_values(stored.value) == point_values(original.value)
+  end
+  h5open(path, "r") do io
+    @test length(read(attributes(io["run/velocity_at_particles_trail"])["times"])) == 1   # the newest is not stored
   end
   # The re-deposited observables equal the originals: nothing derivable was stored, so this pins
   # the restore's recomputation, not a copy.
   @test field_data(velocity_physical(sim2.cache)) == field_data(velocity_physical(sim.cache))
-  @test velocity_at_particles(sim2.cache) == velocity_at_particles(sim.cache)
 
   # Continuation: 4 + 3 steps in one run equals 4 steps, a checkpoint, and 3 more — bitwise, the
   # default deterministic forcing making the comparison exact.
@@ -346,4 +351,84 @@ end
   other_band = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 1)
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, velocity_forcing = other_band,
                                         state = sim.state)
+end
+
+
+@testset "every particle scheme continues bitwise from a checkpoint, mid-start-up included" begin
+  path = tempname() * ".h5"
+  # Written after two iterations: `AB(4)` and `ABM(4)` are still starting up, on the adaptive step
+  # and with shortened first steps, so the restored run must pick the start-up up where it stood —
+  # which it can, since the start-up reads nothing but the trail's own times.
+  for scheme in (Heun(), AB(1), AB(4), ABM(4)), shortened in (false, true)
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, rng = MersenneTwister(31),
+                     particles = ParticleTracking(number_of_particles = 6, particle_integration_scheme = scheme,
+                                                  shortened_first_steps = shortened))
+    advance!(sim); advance!(sim)
+    h5open(io -> write_simulation(io, "run", sim), path, "w")
+    sim2 = h5open(io -> read_simulation(io, "run"), path, "r")
+    @test sim2.particle_integration_scheme === scheme
+    @test sim2.shortened_first_steps == shortened
+    @test length(velocity_at_particles_trail(sim2.cache)) == length(velocity_at_particles_trail(sim.cache))
+    for _ in 1:6
+      advance!(sim); advance!(sim2)
+    end
+    @test current_time(sim2) === current_time(sim)
+    @test point_positions(sim2.tracers.positions) == point_positions(sim.tracers.positions)
+    @test all(point_values(a.value) == point_values(b.value) && a.time === b.time
+              for (a, b) in zip(velocity_at_particles_trail(sim2.cache), velocity_at_particles_trail(sim.cache)))
+  end
+  rm(path)
+end
+
+
+@testset "a checkpoint with tracers written before the trail carried times is refused" begin
+  # Version 0.2 stored the earlier samples without their times. Such a file is told apart by the
+  # absence of the trail's group; here one is made by removing it.
+  path = tempname() * ".h5"
+  sim = Simulation(grid_points_per_axis = 8, viscosity = 0.05, rng = MersenneTwister(5),
+                   particles = ParticleTracking(number_of_particles = 4))
+  advance!(sim)
+  h5open(path, "w") do io
+    write_simulation(io, "run", sim)
+    HDF5.delete_object(io["run"], "velocity_at_particles_trail")
+  end
+  refusal = try h5open(io -> read_simulation(io, "run"), path, "r") catch e; e end
+  @test refusal isa ArgumentError
+  @test occursin("before version 0.3", refusal.msg) && occursin("read_tracers", refusal.msg)
+  # Its state and tracers are still readable, which is the way on the message names.
+  @test h5open(io -> read_tracers(io["run"], "tracers", sim.domain), path, "r") isa Tracers
+  rm(path)
+end
+
+
+@testset "write_trail / read_trail round-trip a caller's trail" begin
+  path = tempname() * ".h5"
+  domain = make_domain()
+  tracers = Tracers(domain; number_of_particles = 5, interpolation_scheme = CatmullRom, rng = MersenneTwister(3))
+  for (allocator, capacity, count) in ((new_scalar_point_values, 4, 6), (new_vector_point_values, 3, 2),
+                                       (new_vector_point_values, 2, 0))
+    trail = ParticleTrail(allocator, tracers, capacity)
+    for n in 1:count
+      push!(value -> (point_values(value) .= n .+ rand(size(point_values(value))...)), trail, 0.1n^2)
+    end
+    h5open(io -> (io["trail"] = trail), path, "w")                 # the `parent[name] = object` sugar
+    back = h5open(io -> read_trail(io, "trail", tracers), path, "r")
+    @test typeof(back) === typeof(trail)
+    @test length(back) == length(trail) == min(count, capacity)
+    @test [sample.time for sample in back] == [sample.time for sample in trail]
+    @test all(point_values(a.value) == point_values(b.value) for (a, b) in zip(back, trail))
+    # The capacity came back too: the restored trail drops its oldest sample exactly when the original would.
+    push!(value -> (point_values(value) .= 0), back, 1.0e3); push!(value -> (point_values(value) .= 0), trail, 1.0e3)
+    @test length(back) == length(trail)
+  end
+  # A trail is read onto the tracers it is given, and one that does not fit them is refused.
+  trail = ParticleTrail(new_vector_point_values, tracers, 2)
+  push!(value -> (point_values(value) .= 1), trail, 0.5)
+  h5open(io -> write_trail(io, "trail", trail), path, "w")
+  fewer = Tracers(domain; number_of_particles = 3, interpolation_scheme = CatmullRom, rng = MersenneTwister(3))
+  @test_throws ArgumentError h5open(io -> read_trail(io, "trail", fewer), path, "r")
+  single = Tracers(make_domain(; T = Float32); number_of_particles = 5, interpolation_scheme = CatmullRom)
+  @test_throws ArgumentError h5open(io -> read_trail(io, "trail", single), path, "r")
+  @test_throws ArgumentError h5open(io -> read_trail(io, "absent", tracers), path, "r")
+  rm(path)
 end

@@ -1,18 +1,18 @@
-# Witness r4-test-critic-04 — AdamsBashforth's order bounds are enforced at both ends.
+# Witness r4-test-critic-04 — the particle schemes' step counts are bounded at both ends.
 #
-# Claim under test: `AdamsBashforth(; order)` rejects `order < 1` and `order > 8`, the ceiling
-# guarding the four-point Gauss–Legendre rule that integrates the interpolation weights
-# (exact only through degree 7, i.e. through `order = 8`), and nothing in the suite pins either
-# bound, so a regression that widened or dropped one would pass unnoticed.
+# Claim under test: `AB(k)` rejects `k < 1` and `k > 8`, and `ABM(k)` rejects `k < 1` and `k > 7`,
+# the ceilings guarding the four-point Gauss–Legendre rule that integrates the weights (exact only
+# through degree 7, i.e. through eight nodes: the eight samples of `AB(8)`, or the seven samples and
+# the step's end of `ABM(7)`), and nothing in the suite pinned either bound, so a regression that
+# widened or dropped one would pass unnoticed.
 #
-# This file asserts the CORRECT behaviour: both bounds throw, order 8 is accepted, and the
-# quadrature really does go inexact one step above the ceiling (so the ceiling sits where the
-# numerics put it, not one off).
+# This file asserts the CORRECT behaviour: both bounds throw, the last admitted count is accepted,
+# and the quadrature really does go inexact one node above the ceiling (so the ceiling sits where
+# the numerics put it, not one off).
 
 using Test
 using GBGHomogeneousTurbulence
-using GBGHomogeneousTurbulence.Particles: AdamsBashforth
-const AB = GBGHomogeneousTurbulence.Particles
+using GBGHomogeneousTurbulence.ParticlePropagator: _adams_weights
 
 # Exact Adams–Bashforth weights in rational arithmetic, on the same node layout the scheme uses:
 # τ_j = -(j-1) (unit steps going backwards), b_j = ∫_0^1 L_j(t) dt.
@@ -36,27 +36,38 @@ function exact_weights(τ::Vector{Rational{BigInt}})
   return b
 end
 
-weights_at(k) = AB._adams_bashforth_weights(zeros(Float64, k), zeros(Float64, k), 1.0,
-                                            ones(Float64, max(k - 1, 1)), k)
+# The largest error of the package's weights on `n` nodes: the samples at 0, −1, …, with the step's
+# end at +1 leading when `with_step_end`.
+function quad_error(n; with_step_end::Bool = false)
+  nodes = with_step_end ? Rational{BigInt}[2 - j for j in 1:n] : Rational{BigInt}[-(j - 1) for j in 1:n]
+  got = collect(_adams_weights(Tuple(Float64.(nodes)), 1.0))
+  return maximum(abs.(got .- Float64.(exact_weights(nodes))))
+end
 
-quad_error(k) = maximum(abs.(weights_at(k) .-
-                             Float64.(exact_weights(Rational{BigInt}[-(j - 1) for j in 1:k]))))
-
-@testset "AdamsBashforth enforces both ends of its documented order range" begin
+@testset "AB and ABM enforce both ends of their documented ranges" begin
   # ---- the floor -----------------------------------------------------------------------------
-  @test_throws ArgumentError AdamsBashforth(order = 0)
-  @test_throws ArgumentError AdamsBashforth(order = -1)
+  @test_throws ArgumentError AB(0)
+  @test_throws ArgumentError AB(-1)
+  @test_throws ArgumentError ABM(0)
 
   # ---- the ceiling, pinned at the exact boundary rather than an off-by-one guess ---------------
-  @test AdamsBashforth(order = 8) isa AdamsBashforth{8}
-  @test_throws ArgumentError AdamsBashforth(order = 9)
+  @test AB(8) isa AB{8}
+  @test_throws ArgumentError AB(9)
+  @test ABM(7) isa ABM{7}
+  @test_throws ArgumentError ABM(8)
+  # The parametric form is no way round it.
+  @test_throws ArgumentError AB{9}()
+  @test_throws ArgumentError ABM{8}()
 
   # ---- and the ceiling is where the quadrature puts it ----------------------------------------
-  # Four-point Gauss–Legendre is exact through degree 7, i.e. through order 8; one order higher the
-  # weights are inexact. Called below the constructor on purpose: this is the hazard the ceiling
-  # exists to prevent. Measured 2026-08-21: 1.7e-16 at k = 8, 3.94e-8 at k = 9 — the latter is
-  # comfortably above the 1e-10 tolerance `test/regressions/01-numerics-and-types-01.jl` holds every
-  # accepted order to, so a regression that WIDENED the ceiling would already fail that test.
+  # Four-point Gauss–Legendre is exact through degree 7, i.e. through eight nodes; one node more and
+  # the weights are inexact. Called below the constructors on purpose: this is the hazard the
+  # ceilings exist to prevent. Measured 2026-08-21 on the samples alone: 1.7e-16 at eight nodes,
+  # 3.94e-8 at nine — the latter comfortably above the 1e-10 tolerance
+  # `test/regressions/01-numerics-and-types-01.jl` holds every accepted count to, so a regression that
+  # WIDENED a ceiling would already fail that test.
   @test quad_error(8) < 1e-10
   @test quad_error(9) > 1e-10
+  @test quad_error(8; with_step_end = true) < 1e-10      # ABM(7): seven samples and the step's end
+  @test quad_error(9; with_step_end = true) > 1e-10      # ABM(8) would be here
 end

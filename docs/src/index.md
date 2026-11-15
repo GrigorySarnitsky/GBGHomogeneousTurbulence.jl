@@ -127,9 +127,12 @@ Listed in build order — each module uses the ones above it. The
   rather than assembling the physics itself.
 - [`Propagator`](api/Propagator.md): the interchangeable integrating-factor schemes under
   [`AbstractIntegrator`](@ref GBGHomogeneousTurbulence.Propagator.AbstractIntegrator).
-- [`Particles`](api/Particles.md): Lagrangian particle tracking — today the massless tracer —
-  advection along trajectories and field sampling there, with selectable interpolation and
-  particle integration schemes.
+- [`Particles`](api/Particles.md): the Lagrangian particles — today the massless tracer — with
+  field sampling along their trajectories, a selectable interpolation scheme, and the trail of a
+  quantity's last few samples, for its time derivative there.
+- [`ParticlePropagator`](api/ParticlePropagator.md): the interchangeable particle integration
+  schemes under
+  [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.ParticlePropagator.AbstractParticleIntegrator).
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the
   Courant–Friedrichs–Lewy (CFL) adaptive loop ([`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) / [`run!`](@ref GBGHomogeneousTurbulence.SimulationRun.run!) / [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!)) that drives it. Read the state through `sim.state`, the deposited observables through
   `sim.cache`.

@@ -18,6 +18,9 @@
 #                      rescale to a requested energy or variance and call these reductions to do it,
 #                      rather than carrying a second spelling of the same formula.
 #   State            — the spectral state + initial conditions (the MZ State role)
+#   Particles        — the Lagrangian tracers (instruments) as state, and what is measured at them:
+#                      the samples and the trail of a quantity's last few. Ahead of `Cache`, which
+#                      holds a trail of the velocity at the particles.
 #   Cache            — the ObservablesCache: the storage the iteration deposits its
 #                      observables into at its end (no-recompute; slots double as the step's registers)
 #   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source. Included BEFORE
@@ -27,7 +30,8 @@
 #                      gathered into ResolvedGenerator (FlowConditions + assembly scratch + the protocol
 #                      prepare!/velocity_rhs!/scalar_rhs!/velocity_integrating_factor/scalar_integrating_factor/finalize!)
 #   Propagator       — integrating-factor schemes (AbstractIntegrator) — the time map
-#   Particles        — Lagrangian tracer tracking (instruments)
+#   ParticlePropagator — the particle integration schemes (AbstractParticleIntegrator) — the time
+#                      map of the tracers, after the cache whose samples it integrates over
 #   SimulationRun    — the ergonomic run layer (Simulation + run!/warmup!/advance!)
 
 
@@ -54,6 +58,9 @@ trajectories. It has these submodules:
 
 - [`Particles`](@ref GBGHomogeneousTurbulence.Particles) — the Lagrangian tracers.
 
+- [`ParticlePropagator`](@ref GBGHomogeneousTurbulence.ParticlePropagator) — the schemes that
+  advance the tracers.
+
 - [`SimulationRun`](@ref GBGHomogeneousTurbulence.SimulationRun) — the run layer, checkpointing
   ([`write_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.write_simulation)) once `HDF5` is loaded.
 
@@ -72,11 +79,12 @@ using GBGPeriodicFields
 include("SimulationDomain.jl")
 include("Observables.jl")
 include("State.jl")
+include("Particles.jl")
 include("Cache.jl")
 include("Forcing.jl")
 include("Generator.jl")
 include("Propagator.jl")
-include("Particles.jl")
+include("ParticlePropagator.jl")
 include("SimulationRun.jl")
 
 
@@ -106,7 +114,7 @@ using .Cache:
   velocity_physical,
   vorticity_physical,
   scalar_physical,
-  velocity_at_particles
+  velocity_at_particles_trail
 
 using .Generator:
   FlowConditions,
@@ -170,18 +178,22 @@ using .Propagator:
 
 using .Particles:
   Tracers,
-  AbstractParticleIntegrator,
-  Heun,
-  AdamsBashforth,
-  ParticleIntegratorBuffers,
   ParticleTraversal,
   rebuild_traversal!,
-  history_depth,
-  advect!,
   interpolate_at_particles!,
   unwrapped_positions,
   new_vector_point_values,
-  new_scalar_point_values
+  new_scalar_point_values,
+  ParticleTrail,
+  time_derivative!,
+  time_derivative
+
+using .ParticlePropagator:
+  AbstractParticleIntegrator,
+  Heun,
+  ABM,
+  AB,
+  advect!
 
 using .SimulationRun:
   Simulation,
@@ -204,7 +216,7 @@ export FixedDomain,
        velocity_physical,
        vorticity_physical,
        scalar_physical,
-       velocity_at_particles,
+       velocity_at_particles_trail,
        new_vector_field_spectral,
        new_vector_field_physical,
        new_scalar_field_spectral,
@@ -273,18 +285,20 @@ export FixedDomain,
        recommended_cfl,
        FlowConditions,
        Tracers,
-       AbstractParticleIntegrator,
-       Heun,
-       AdamsBashforth,
-       ParticleIntegratorBuffers,
        ParticleTraversal,
        rebuild_traversal!,
-       advect!,
-       history_depth,
        interpolate_at_particles!,
        unwrapped_positions,
        new_vector_point_values,
        new_scalar_point_values,
+       ParticleTrail,
+       time_derivative!,
+       time_derivative,
+       AbstractParticleIntegrator,
+       Heun,
+       ABM,
+       AB,
+       advect!,
        Simulation,
        PassiveScalar,
        ParticleTracking,
@@ -304,10 +318,11 @@ export FixedDomain,
 # extension, loaded alongside the HDF5 package).
 using .SimulationDomain: write_domain, read_domain
 using .State: write_state, read_state
-using .Particles: write_tracers, read_tracers
+using .Particles: write_tracers, read_tracers, write_trail, read_trail
 using .Forcing: write_forcing, read_forcing
 using .SimulationRun: write_simulation, read_simulation
 export write_domain, read_domain, write_state, read_state, write_tracers, read_tracers,
+       write_trail, read_trail,
        write_forcing, read_forcing, write_simulation, read_simulation
 
 end # module GBGHomogeneousTurbulence

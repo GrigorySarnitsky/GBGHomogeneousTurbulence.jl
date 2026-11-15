@@ -487,44 +487,61 @@ Method (§3).
   the observables cache's charts (§4.1): a `step!` is stage arithmetic over the generator protocol and
   the scheme's registers, nothing more. None of this scratch is state (§11 decisions 26, 30, 31).
 
-### 4.6 `Particles` — Lagrangian instruments
+### 4.6 `Particles` and `ParticlePropagator` — Lagrangian instruments
 
 Particles are *instruments* — probes of the turbulence — not a second physics. A particle is a
 state-carrying trajectory object: today a tracer (position ``\boldsymbol{X}``); the deferred ladder is
 inertial (``\boldsymbol{X}, \boldsymbol{v}``) and oriented (``\boldsymbol{X}, \boldsymbol{v}, \boldsymbol{L}``)
-probes (§7). `Tracers` holds positions and a chosen interpolation scheme — trajectory state only,
-with the particle integration scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
-scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
-(decision 50). The default scheme, `Heun`, is Heun-in-time on
-the velocity at the iteration's two endpoints. The first, ``\boldsymbol{v}_1``, is the *trajectory
-sample* ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` recorded by the previous closing deposit — the genuine
-Lagrangian velocity, held in the observables cache's own `velocity_at_particles` slot and dated
-against BOTH epochs, since it is a function of the state and the positions together (read through
-`velocity_at_particles`, §11 decisions 42 and 67). The second, ``\boldsymbol{v}_2``, interpolates the just-deposited
-``\boldsymbol{u}(t_{n+1})`` at the Heun predictor positions, which no tracer ever occupies:
-`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, the particle form of
-`deposit!` interpolates the new sample at the new positions from the same deposited field and
-stamps it at the current epochs — one closing act per dynamical factor, `step!` then `deposit!`,
-`advect!` then `deposit!` — completing the iteration's deposits; `interpolate_at_particles!` reads
-any field along the trajectories for Lagrangian statistics.
+probes (§7). The concern is two modules, split where the field side is split: `Particles` holds the
+state and what is measured at it, `ParticlePropagator` the map that advances it, as `State` is held
+apart from `Propagator` (decisions 50 and 121). `Particles` loads before the observables cache and
+`ParticlePropagator` after it, because the cache holds particle storage and the step reads the cache.
+
+The type `Tracers` holds positions and a chosen interpolation scheme — trajectory state only — and
+the function `interpolate_at_particles!` reads any field along the trajectories for Lagrangian
+statistics. A `ParticleTrail` keeps the last few *samples* of one quantity at the particles, each
+with its time, and `time_derivative!` differentiates it along the trajectories; it is short by
+design, since it serves derivatives, and a long history is the caller's to keep. The trail's values
+are the field library's point values throughout: the package neither hands out nor works on their
+bare storage.
+
+The velocity at the particles, ``\boldsymbol{u}(t, \boldsymbol{X}(t))``, is the genuine Lagrangian
+velocity and an observable, so its trail is the observables cache's (decisions 42 and 67), read
+through `velocity_at_particles_trail`. A sample belongs to the particles' time: it stays current
+while the positions have not moved, whatever the fields have done since. The cache's two counters,
+one per dynamical factor, say whether a field and a set of positions belong to one time; the
+particle deposit refuses a pair that does not, and the particle step refuses to run unless the
+fields are exactly one step ahead. One closing act follows each advance, `step!` then `deposit!`,
+`advect!` then `deposit!`.
 
 The sample deposit is what keeps an instrument of ``M`` tracers at ``M``-point cost: depositing the sample
 at the particles stores ``M\times3`` values where retaining the endpoint field would cost an
 ``N^{3}\times3`` resident buffer and copy (``N`` grid points per axis). Tracked and untracked runs therefore have identical
-field-scale residency and per-step traffic — the zero both audits assert. (One tempting reuse is
-recorded as forbidden: ``\boldsymbol{v}_2 \approx \boldsymbol{u}(t_{n+1},\boldsymbol{X}^*)``
-differs from the next sample only at ``\mathcal{O}(\Delta t^{2})``, so reusing it as the next
-``\boldsymbol{v}_1`` looks like a free interpolation saved — but it corrupts the recorded observable
-the Lagrangian statistics accumulate. Never approximate the thing you measure.)
+field-scale residency and per-step traffic — the zero both audits assert. What tracers do cost is
+counted in arrays of ``M`` rows, against a bound read off each scheme's formula (the
+particle-scale ledger of the memory audit).
+
+One tempting reuse is recorded as forbidden: the velocity at the predicted positions
+differs from the next sample only at ``\mathcal{O}(\Delta t^{2})``, so keeping it as that sample
+looks like a free interpolation saved — but it corrupts the recorded observable
+the Lagrangian statistics accumulate. Never approximate the thing you measure.
 
 Their numerics are first-class, on the same footing as the field schemes — and pluggable in the
-same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers, cache)` builds its
-registers. Two axes matter: the particle integration scheme — the default second-order `Heun`, and the
-variable-step `AdamsBashforth` (order 4 by default, its sample history held in the observables cache
-and its weight scratch in the shared `ParticleIntegratorBuffers`; decisions 57 and 70) for a run whose trajectory accuracy in
-time limits a measurement — and the sampling-consistency axis, the interpolation scheme's order
-relative to the field's spectral accuracy (`CatmullRom` by default, higher-order `LalescuSpline` /
-`LagrangeSpline` available).
+same way: `AbstractParticleIntegrator` is the family. Its members are the Adams methods: `AB(k)`
+integrates the polynomial through the last ``k`` samples, and `ABM(k)` corrects that step with the
+velocity at the positions it predicted, one order higher at a second interpolation, with `Heun`
+its one-step member. The weights are rebuilt every step from the samples' actual times, since the
+run's timestep varies.
+
+A scheme owns no storage of the particles' size: the positions are advanced
+in place, the correction applied as the difference of the two formulas, and the velocity at the
+predicted positions written into the trail slot the closing deposit fills, so the trail keeps
+exactly as many values as the scheme has alive at once. A multistep scheme starts on the lower
+members of the family, which caps the accuracy at third order unless the run shortens its first
+timesteps (`shortened_first_steps`). The second axis is sampling consistency, the interpolation
+scheme's order relative to the field's spectral accuracy (`CatmullRom` by default, higher-order
+`LalescuSpline` / `LagrangeSpline` available).
+
 The gathers themselves visit the tracers in a memory-locality order, the `ParticleTraversal` — a
 value-preserving accelerator (the interpolated values are bit-identical with or without it) that
 `Simulation` owns beside the tracer set and rebuilds every iteration by default, the
@@ -537,12 +554,12 @@ scheme — the reversible generator of §8 again — so the split does not naive
 ### 4.7 `SimulationRun` — the front door
 
 A `Simulation` value bundles what one iteration advances and reads — the present instant (the one
-bounded look-back is the cache's Lagrangian sample history, which a multistep particle scheme
+bounded look-back is the cache's trail of velocity samples, which the particle scheme
 needs): the `FixedDomain`, the `ResolvedFields` state (the
 fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, in spectral representation, the generator acts on), the `ObservablesCache`
 observables cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
 scheme registers, the chosen `AbstractIntegrator`, any `Tracers` with its own
-`AbstractParticleIntegrator`, `ParticleIntegratorBuffers` and gather-order `ParticleTraversal`
+`AbstractParticleIntegrator` and gather-order `ParticleTraversal`
 (decision 86), a stored CFL ceiling and step ceiling, and a clock.
 Over it:
 
@@ -674,10 +691,10 @@ appears (decision 18).
 
 ### 4.9 Layout summary
 
-`SimulationDomain → Observables → State → Cache → Forcing → Generator → Propagator → Particles →
-SimulationRun`.
+`SimulationDomain → Observables → State → Particles → Cache → Forcing → Generator → Propagator →
+ParticlePropagator → SimulationRun`.
 Cross-module access is through explicit `using ..Module: name` lists. The reference-law module
-`Phenomenology` (§4.8) is parked outside the package and outside this order.
+`Phenomenology` (§4.8) is parked outside the package and this order.
 Statistics live consumer-side of this package too: the sampling in `Particles` and the observables in
 `Observables` produce the *samples*, and a statistics bridge that streams them to `GBGStreamingStatistics`
 is deferred (§7).
@@ -3496,6 +3513,76 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     docstrings, the pages and this document; all are now upright. The rulebook does not state the
     convention yet, and it has been requested of [GBGCodingTools](https://grigorysarnitsky.github.io/GBGCodingTools.jl/); until it lands, nothing checks it.
 
+121. **(2026-11-15, user-directed) The velocity at the particles is a public trail of samples, and
+    the particle schemes are the Adams family, owning no storage.** The earlier samples a multistep
+    scheme integrates over were kept in the cache as the scheme's private history; they are
+    observables — the Lagrangian velocity at earlier times — and what a user differentiates for
+    the acceleration. Settled by the owner, point by point, as the paragraphs below record.
+
+    *The trail.* `ParticleTrail` is a public type: the last few samples of one quantity at the
+    particles, each a value with its time. It is read by offset from the newest, `trail[0]`,
+    `trail[-1]`, each a named pair `(time, value)`; written by `push!(trail, t) do value … end`,
+    which hands out the trail's own storage, so nothing is copied and a sample that fails to be
+    written is never readable; and differentiated in time at the newest sample by
+    `time_derivative!`, order 0 included. Its length is fixed by its use, derivatives: a long
+    history is the caller's. A value is the field library's point values and never a bare
+    array, here or anywhere in the package.
+
+    *The cache.* It keeps one trail, of the velocity, built from the run's tracers and particle
+    scheme, and read through `velocity_at_particles_trail`; `velocity_at_particles`, which
+    returned the bare array of the newest sample, is removed. One stamp, the particles epoch of
+    the newest sample, replaces the two-epoch stamp: a sample belongs to the particles' time, so
+    the read answers to the particles counter alone. The two counters are compared where a field
+    meets positions — the particle deposit needs them equal, the particle step needs the fields
+    one ahead — and the first sample pairs them, so that fields may be stepped alone before
+    tracking starts. Neither the step nor the deposit takes a field: both read the cache's.
+
+    *The schemes.* `AB(k)` replaces `AdamsBashforth(order = k)`; `ABM(k)` is new, the `AB(k)`
+    predictor with the ``k``-step Adams–Moulton corrector, of order ``k + 1``, ``k`` counting the
+    predictor's steps so that `ABM(1)` is `Heun`, which keeps its name. Both stop at order 8, the
+    exactness of the weights' quadrature. The predictor is written in place and the corrector
+    applied as the difference of the two formulas; the velocity at the predicted positions goes
+    into the trail slot the closing deposit fills. So the trail keeps ``k`` samples for `AB(k)`
+    and ``k + 1`` for `ABM(k)`, each a real sample between iterations, and a scheme owns nothing:
+    `ParticleIntegratorBuffers`, the particle form of `allocate_buffers` and `history_depth` are
+    removed.
+
+    *The start-up.* A scheme short of samples takes the `ABM` step its samples allow. The first
+    step, on one sample, leaves an error of third order whatever the scheme. The run can shorten
+    its first timesteps instead (`shortened_first_steps` on `ParticleTracking`, off by default,
+    an error with a fixed `dt`): the first is ``\tau(\Delta t/\tau)^{p/3}`` for a scheme of order
+    ``p``, with ``\tau = \sqrt{\nu/\varepsilon}`` from the dissipation measured at that step, and
+    the step then grows by a bounded factor. Nothing is stored for it: every bound after the
+    first is read off the trail's times.
+
+    *The growth factor.* The factor first settled, 2 for every order, was measured and restores
+    the full order only through order 5: unevenly spaced samples magnify the errors they carry,
+    the more the higher the order. It is 2 through order 5, 1.5 through 7, 1.25 at 8, each
+    measured to restore the scheme's order, at 2, 6–8 and 17 further iterations.
+
+    *The modules and the checkpoint.* `Particles` is split as the field side is: `Particles`, the
+    state and what is measured at it, loads before the cache; `ParticlePropagator`, the schemes
+    and the step, after it. The earlier samples are stored with their times (schema 3) and the
+    newest is measured again on read. A checkpoint with tracers written before, without times, is
+    refused. A caller's own trail is stored with `write_trail` and `read_trail`.
+
+    *Measured for it, and pinned by the suite.* Each scheme converges at its order on a straining
+    flow with an exact trajectory, at even and uneven steps; the real-axis stability interval of
+    `AB(k)` falls to 0.024 at ``k = 8`` where `ABM(7)` keeps 0.58. The owner's ruling of
+    2026-08-24, that four steps are the practical ceiling because higher orders were worse, is
+    withdrawn on the rerun: with the new start-up a longer scheme costs nothing, and its order is
+    lost, not harmful.
+
+    *The particle-scale ledger.* The count of particle-sized arrays is now held against a bound
+    read off each scheme's formula, where it was frozen from the implementation — which had let
+    the multistep scheme carry the two arrays of its `Heun` start-up for the whole run.
+
+    *One departure from the design as discussed.* The checked read that opens `advance!` stays,
+    since the particle step's own check runs after the field step and would otherwise refuse an
+    iteration it had half made. This entry supersedes the storage arrangements of decisions 50,
+    57, 67 and 70; their reasoning — state apart from scheme, the sample an observable of the
+    flow — stands.
+
 ## References
 
 Works are cited author–year above and given in full here, each with its DOI where the work has one. Four do not,
@@ -3532,7 +3619,7 @@ cites.
   and the source for choosing interpolation order in particle tracking — decision 57's floor.)*
 - Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys.
   Commun.* 278, 108406. *(TurTLE; the
-  Adams–Bashforth tracer integration `AdamsBashforth` follows, decision 57.)*
+  Adams–Bashforth tracer integration `AB` follows, decision 57.)*
 - Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* 6(4), 1612–1614.
   *(`VarianceRescaling`: the per-step rescaling of the low-``\kappa``
   modes to a fixed band energy. Kept as the reference implementation, with its first-order

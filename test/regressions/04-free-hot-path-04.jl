@@ -1,54 +1,48 @@
-# Witness: allocate_buffers(::AdamsBashforth{K}, tracers, cache) must not accept a cache whose
-# Lagrangian sample history is shallower than the scheme needs (K-1 past samples).
+# Witness: a particle scheme must not run on a cache that keeps fewer samples of the velocity at the
+# particles than the scheme integrates over.
 #
-# The hand-assembled route both `ParticleIntegratorBuffers`' and `Tracers`' docstrings show builds the cache
-# separately from the scheme; `ObservablesCache`'s `history_depth` defaults to 1, so a depth-1 cache
-# handed to `AdamsBashforth(order = 4)` is a construction-time mismatch that nothing rejects. The
-# right behaviour is a named `ArgumentError` at `allocate_buffers` (the shape every neighbouring
-# hazard in this subsystem takes), not a `BoundsError` from library internals on a later `advect!`.
+# The defect: the cache was built apart from the scheme, with a sample history that defaulted to
+# none, so a cache without history handed to a four-step scheme was a construction-time mismatch
+# nothing rejected, and the first push died with a `BoundsError` from library internals. The right
+# behaviour is a named `ArgumentError` where the two meet.
+#
+# The cache is now built FROM the scheme, so the mismatch needs two schemes to make; where they meet
+# is the particle step, which refuses it by name.
 
 using Test, Random
-using GBGPeriodicFields: npoints
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, CatmullRom
 
-@testset "a cache too shallow for an AdamsBashforth scheme is refused at allocate_buffers, not by a later BoundsError" begin
+include(joinpath(@__DIR__, "..", "prescribed_flow.jl"))
+
+@testset "a cache keeping too few samples for the scheme is refused by name, not by a later BoundsError" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
                        dealiasing = TwoThirds(), array_family = Array)
-  u = new_vector_field_physical(domain)
-  field_data(u) .= 0.3
-
-  scheme = AdamsBashforth(order = 4)          # needs history_depth(scheme) == 4, i.e. 3 past slots
+  uniform!(u, t) = (field_data(u) .= 0.3; u)
+  scheme = AB(4)                              # integrates over four samples
 
   make = () -> begin
     tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom,
                       rng = MersenneTwister(1))
-    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
-    (tracers, cache)                          # history_depth defaults to 1 ⇒ zero past slots
+    (tracers, ObservablesCache(domain; tracers, particle_integration_scheme = Heun()))   # keeps two
   end
 
-  # 1. The mismatch is detectable where it is created: the cache carries fewer past-sample slots
-  #    than the scheme's order requires.
+  # 1. The mismatch cannot be made by omission: a cache with tracers names its scheme.
   let (tracers, cache) = make()
-    @test length(cache.velocity_at_particles_history) < history_depth(scheme) - 1
+    @test_throws ArgumentError ObservablesCache(domain; tracers)
   end
 
-  # 2. The guard: `allocate_buffers` should refuse the pairing with a named `ArgumentError`.
+  # 2. Whatever the pairing, no index error may escape from library internals: it is rejected by
+  #    name (`ArgumentError`) at the first step, and stays rejected.
   let (tracers, cache) = make()
-    @test_throws ArgumentError allocate_buffers(scheme, tracers, cache)
-  end
-
-  # 3. Whatever the fix, no index error may escape from library internals. Either the pairing is
-  #    rejected up front (`ArgumentError`) or the advance goes through; a `BoundsError` is neither.
-  let (tracers, cache) = make()
-    outcome = try
-      buffers = allocate_buffers(scheme, tracers, cache)
-      deposit!(cache, tracers, u)
-      advect!(scheme, tracers, u, domain, buffers, 0.01)
-      :advanced
-    catch err
-      err isa ArgumentError ? :rejected : Symbol(nameof(typeof(err)))
+    outcomes = map(1:3) do _
+      try
+        advect_in_prescribed_flow!(uniform!, scheme, tracers, domain, cache, (0.01,))
+        :advanced
+      catch err
+        err isa ArgumentError ? :rejected : Symbol(nameof(typeof(err)))
+      end
     end
-    @test outcome === :rejected || outcome === :advanced
+    @test outcomes[1] === :rejected
   end
 end

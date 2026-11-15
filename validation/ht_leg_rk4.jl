@@ -8,7 +8,8 @@
 #   W3 interpolation:  HT's own u(t₀, X₀) sample matches TurTLE's stored velocity/100.
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields
-using GBGPeriodicFields: inverse_curl!, point_values, PointSet, CatmullRom,
+using GBGHomogeneousTurbulence.Cache: reset_velocity_at_particles!, restore_velocity_at_particles!
+using GBGPeriodicFields: inverse_curl!, point_values, PointSet, CatmullRom, VectorPointValues, adapt!,
                          VectorFieldSpectral, FieldSpectralMultipliers, field_data
 using HDF5
 using AMDGPU
@@ -20,7 +21,7 @@ const DIR = @__DIR__
 const N = 128
 const NP = 10000
 const THORIZON = 36.8
-const DT = 0.002   # the AB4 history intervals of the handoff
+const DT = 0.002   # the spacing of the handoff's AB(4) samples
 const NU = 9.032e-3
 
 println("== reading the frozen handoff")
@@ -76,26 +77,29 @@ sim = Simulation(domain; viscosity = NU,
                  velocity_forcing = ConstantPower(injection_rate = 1.0,
                                                   lowest_shell = 1, highest_shell = 2),
                  field_integration_scheme = IFLowStorageRK4(),
-                 particles = ParticleTracking(tracers; particle_integration_scheme = AdamsBashforth(order = 4)),
+                 particles = ParticleTracking(tracers; particle_integration_scheme = AB(4)),
                  state = state)
 
 # W3 — interpolation parity: HT's own t₀ Lagrangian sample vs TurTLE's stored one.
 vturtle = h5open(joinpath(DIR, "fill_particles.h5"), "r") do io
   read(io["tracers0/velocity/100"])
 end
-w3err = maximum(abs, Array(velocity_at_particles(sim.cache)) .- permutedims(vturtle, (2, 1)))
+w3err = maximum(abs, Array(point_values(velocity_at_particles_trail(sim.cache)[0].value)) .- permutedims(vturtle, (2, 1)))
 @printf("   W3: u(t₀, X₀) HT vs TurTLE max abs diff = %.2e\n", w3err)
 w3err < 1e-10 || @warn "W3 above 1e-10 — interpolant mismatch would grow into the trajectories" w3err
 
-# AB4 history: TurTLE rhs rows 1–3 are u(t₋₁), u(t₋₂), u(t₋₃) — pinned bitwise against
-# fill_particles velocities at iterations 99/98/97. HT's past[j] is the same order.
-for j in 1:3
-  copyto!(point_values(sim.cache.velocity_at_particles_history[j]),
-          ROCArray(permutedims(rhs[:, :, j + 1], (2, 1))))
-  sim.cache.history_steps[j] = DT
+# AB(4) samples: TurTLE rhs rows 1–3 are u(t₋₁), u(t₋₂), u(t₋₃) — pinned bitwise against
+# fill_particles velocities at iterations 99/98/97. The run's trail takes them back in time order,
+# oldest first, at the times −3·DT, −2·DT, −DT, and the ordinary particle deposit then measures the
+# newest again, at the handoff positions and time.
+reset_velocity_at_particles!(sim.cache)
+for j in 3:-1:1
+  restore_velocity_at_particles!(sim.cache, -j * DT) do value
+    adapt!(value, VectorPointValues(permutedims(rhs[:, :, j + 1], (2, 1))))
+  end
 end
-sim.cache.history_filled = 3
-println("   AB4 history injected: 3 slots, steps = $DT, full order from step one")
+deposit!(sim.cache, sim.tracers, 0.0; traversal = sim.particle_traversal)
+println("   AB(4) samples injected: 3 earlier samples, spaced $DT, full order from step one")
 
 println("== running ADAPTIVE steps (recommended CFL for IFLowStorageRK4) to t = $THORIZON on ", AMDGPU.device())
 # Adaptive step: sample EVERY iteration on the irregular time grid; the single-origin VACF makes
@@ -107,7 +111,7 @@ callback = function (s)
   push!(ts, current_time(s))
   push!(K, kinetic_energy(s.state.velocity_spectral))
   push!(E, dissipation(s.state.velocity_spectral, s.domain, NU))
-  v = velocity_at_particles(s.cache)
+  v = point_values(velocity_at_particles_trail(s.cache)[0].value)
   v0[] === nothing && (v0[] = copy(v))
   push!(C, sum(v .* v0[]) / NP)
   st = current_step(s)
@@ -135,7 +139,7 @@ h5open(joinpath(DIR, "ht_rk4adaptive_reference_data.h5"), "w") do io
   a["code"] = "GBGHomogeneousTurbulence (IFLowStorageRK4, ADAPTIVE CFL step, HouLi order 36 strength 63.463), Float64, ROCm GPU"
   a["run"] = "128^3, L = 2π, ν = 9.032e-3, dt = 2e-3, ConstantPower ε_inj = 1 shells 1–2; " *
              "adaptive CFL stepping (recommended ceiling for IFLowStorageRK4) to t = 36.8 from the same frozen handoff; " *
-             "same 10^4 tracers, AB4 warm-started from TurTLE's history, Catmull–Rom interpolation"
+             "same 10^4 tracers, AB(4) warm-started from TurTLE's earlier samples, Catmull–Rom interpolation"
   a["initial_state"] = "handoff_initial_state_iter100.h5, sha256 02c2d2530a731f0701608b4fb219f28bc9006f8d2ac39f4c02daef228823e82f"
   a["time_origin"] = "t = 0 here corresponds to TurTLE absolute time 0.2 (iteration 100)"
   a["ρ_u"] = "single-origin ensemble VACF, computed in the run callback: ρ_u(τ) = ⟨u(τ)·u(0)⟩/⟨|u(0)|²⟩ over the 10^4 tracers, u(0) the velocity at the handoff instant"

@@ -1,50 +1,46 @@
 # Witness 01, lane "free-hot-path".
 #
-# The cache's velocity-at-particles slot is the one observable that is a function of TWO things — the
-# resolved state (the velocity that was interpolated) and the tracer positions (where it was
-# interpolated). The cache keeps two counters for exactly that reason: the particle `deposit!`
-# (its stamping half, `deposit_velocity_at_particles!`) stamps both, `check_deposits` compares both, and the
-# accessor's own docstring says the sample "is current only when both counters match its own".
-#
-# A tracer push advances `particles_epoch` alone, so a read comparing only the fields epoch would serve
-# the sample taken at the positions the push has left. The consequence would be on the hot path:
-# `advance!` opens with `sim.tracers === nothing || velocity_at_particles(sim.cache)`, the run layer's
-# only freshness gate on the Heun v₁.
+# The cache's samples of the velocity at the particles depend on where the tracers were when each was
+# taken. A tracer push advances `particles_epoch`, so until the closing particle deposit the newest
+# sample belongs to positions the tracers have left. The defect this witness was written against was
+# a read that compared the fields epoch alone and so served that sample as current; the consequence
+# was on the hot path, the particle step integrating from a velocity measured somewhere else.
 #
 # This file asserts the CORRECT behaviour: the read refuses a sample whose positions have moved on,
-# and the run layer's opening guard fires.
+# the cache's completeness check agrees, and the next particle step refuses to start from it.
+# (Since 2026-11-15 the read answers to the particles epoch alone — a sample is u(t, X(t)), which a
+# field step does not date — and the particle step makes the check itself, where `advance!` once
+# opened with a read made only for it.)
 
 using Test
 using Random
 using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.Cache: advance_particles_epoch!
+using GBGPeriodicFields: npoints
 
 
-@testset "velocity_at_particles is checked against BOTH epochs, so advance!'s guard fires after a push" begin
+@testset "the trail is checked against the particles epoch, so the particle step refuses after a push" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
                    particles = ParticleTracking(number_of_particles = 8), rng = MersenneTwister(1))
   advance!(sim)
 
-  # Precondition — a closed iteration leaves the slot current on both counters and the read serves.
-  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch
-  @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch
-  v0 = copy(velocity_at_particles(sim.cache))
-  @test size(v0) == (8, 3)
+  # Precondition — a closed iteration leaves the newest sample current and the read serves.
+  @test sim.cache.velocity_at_particles_epoch == sim.cache.particles_epoch == sim.cache.fields_epoch
+  @test npoints(velocity_at_particles_trail(sim.cache)[0].value) == 8
 
   # A push's epoch advance with no closing particle deposit. The state is untouched; the positions
   # the sample belongs to are left behind.
   advance_particles_epoch!(sim.cache)
-  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch          # fields did not move
-  @test sim.cache.velocity_at_particles_particles_epoch != sim.cache.particles_epoch    # positions did
+  @test sim.cache.velocity_at_particles_epoch != sim.cache.particles_epoch    # positions moved on
 
   # (1) The cache's central invariant: a checked read serves a current value or throws.
-  @test_throws ErrorException velocity_at_particles(sim.cache)
+  @test_throws ErrorException velocity_at_particles_trail(sim.cache)
 
-  # (2) The cache already agrees the slot is not current — on the identical state, its own
+  # (2) The cache already agrees the sample is not current — on the identical state, its own
   #     completeness check rejects it. A serving read above is the cache contradicting itself.
   @test_throws ErrorException GBGHomogeneousTurbulence.Cache.check_deposits(sim.cache)
 
-  # (3) The hot-path consequence: `advance!`'s opening guard is that same read, so the advance must
-  #     refuse to integrate the trajectory on a v₁ measured at the positions left behind.
+  # (3) The hot-path consequence: the next particle step must refuse to integrate the trajectory
+  #     from a velocity measured at the positions left behind.
   @test_throws ErrorException advance!(sim)
 end
